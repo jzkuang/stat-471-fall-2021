@@ -27,7 +27,7 @@ This very short "homework" is meant to expose you to the R Markdown format. **It
 Evaluate the sum of 2 and 2 using an R code chunk. Then, comment on the answer you obtained. For those unfamiliar with R, read Section 4.1 [here](https://r4ds.had.co.nz/workflow-basics.html#coding-basics).
 
 ```{r}
-# R code here
+2+2
 ```
 
-**Your answer in bold.**
+**2+2 =4**
