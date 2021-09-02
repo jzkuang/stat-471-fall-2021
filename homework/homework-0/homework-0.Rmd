@@ -1,5 +1,12 @@
 ---
 title: 'STAT 471: Homework 0'
+author: "Shuxiao Chen"
+date: 'Due: August 31, 2021'
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+=======
 author: "FirstName LastName"
 date: 'Due: September 1, 2021'
 output:
@@ -31,3 +38,10 @@ Evaluate the sum of 2 and 2 using an R code chunk. Then, comment on the answer y
 ```
 
 **2+2 =4**
+=======
+ans = 2 + 2
+print(ans)
+```
+
+**2+2=`r ans`**
+>>>>>>> cd98f1c487f690066aa80b68ea3f70748c26628a

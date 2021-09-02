@@ -17,9 +17,7 @@ output:
 urlcolor: blue
 ---
 
-```{r setup, include=FALSE}
-options(scipen = 0, digits = 3)  # controls number of significant digits printed
-```
+
 
 \newpage
 
@@ -72,11 +70,30 @@ The dataset has the following variables:
 - `X1998.pct`, ..., `X2014.pct`: win percentage for each year
 
 We'll need to use the following `R` packages:
-```{r, message = FALSE}
+
+```r
 library(tidyverse)  # tidyverse
 library(ggrepel)    # for scatter plot point labels
+```
+
+```
+## Warning: package 'ggrepel' was built under R version 4.1.1
+```
+
+```r
 library(kableExtra) # for printing tables
+```
+
+```
+## Warning: package 'kableExtra' was built under R version 4.1.1
+```
+
+```r
 library(cowplot)    # for side by side plots
+```
+
+```
+## Warning: package 'cowplot' was built under R version 4.1.1
 ```
 
 # Wrangle (30 points for correctness; 5 points for presentation)
