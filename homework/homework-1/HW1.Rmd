@@ -1,6 +1,6 @@
 ---
 title: 'STAT 471: Homework 1'
-author: 'Name'
+author: 'James Kuang'
 date: 'Due: September 15, 2021 at 11:59pm'
 output:
   bookdown::pdf_document2:
