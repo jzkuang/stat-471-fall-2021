@@ -21,28 +21,28 @@ Textbook abbreviations:
 - ISLRv2 = [Introduction to Statistical Learning, edition 2](https://web.stanford.edu/~hastie/ISLRv2_website.pdf)
 - R4DS = [R for Data Science](https://r4ds.had.co.nz/)
 
-Date | Unit | Topic | Readings | Recording | Assignments
+Date | Unit | Topic | Readings | Materials | Assignments
 :---|:---|:---|:---|:---|:---
-Tue 8/31 | 1. Intro to modern data mining | Intro to modern data mining | ISLR pp. 1-30  |  [Link](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=0d0908a1-96ef-407e-9b7f-ad8e01169e8c) | --
-Wed 9/1 | -- | Computing tutorial (5:15-6:45pm in JMHH 360) | R4DS Ch. 1.4, 1.5, 1.6, 4, 6, 17, 20.1-20.5, 21.1-21.2, 26, 27, 30 | TBA | [Homework 0](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-0/homework-0.pdf) due at 11:59pm
-Tue 9/2 | 1. Intro to modern data mining | Data wrangling | R4DS Ch. 9-13,15 | TBD | --
-Thu 9/7 | 1. Intro to modern data mining | Exploratory data analysis | R4DS Ch. 2,3,5,7 | TBA | --
-Thu 9/9 | 1. Intro to modern data mining | Linear regression | ISLR pp. 59-63, 69-74, 82-86 | TBA | --
-Tue 9/14 | 1. Intro to modern data mining | Unit 1 Review | -- | TBA | Quiz 1 in class
-Wed 9/15 | -- | -- | -- | -- | [Homework 1](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-1/HW1.pdf) due at 11:59pm
+Tue 8/31 | 1. Intro to modern data mining | Intro to modern data mining | ISLR pp. 1-30  |  [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=0d0908a1-96ef-407e-9b7f-ad8e01169e8c);<br />[Slides (Keynote)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-1/unit-1-lecture-1.key);<br />[Slides (PDF)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-1/unit-1-lecture-1.pdf)| --
+Wed 9/1 | -- | Computing tutorial (5:15-6:45pm in JMHH 360) | R4DS Ch. 1.4, 1.5, 1.6, 4, 6, 17, 20.1-20.5, 21.1-21.2, 26, 27, 30 | [Tutorial recording](https://upenn.zoom.us/rec/share/6UUjphmFPKqiqIDAGsnkghStcS6A3pIirfTkTur6PbT4kfZazZGnFE1SpX0hEVr6.FeuY7QKCsy0FQjFb?startTime=1630531029000) (passcode #Pj@gnL1);<br />[R tutorial (R Markdown)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/getting-started/r-tutorial.Rmd);<br />[R tutorial (PDF)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/getting-started/r-tutorial.pdf)| [Homework 0](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-0/homework-0.pdf) due at 11:59pm
+Thu 9/2 | 1. Intro to modern data mining | Linear regression | ISLR pp. 59-63, 69-74, 82-86 | [Conceptual material (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=c72b543a-a89a-4555-8a18-acbe0036311c);<br />[Programming material (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=fb2aa643-31bb-43b4-84fc-acbe013834db&start=607);<br />[Programming material (R Markdown)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-1/unit-1-lecture-2-programming.Rmd);<br />[Programming material (PDF)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-1/unit-1-lecture-2-programming.pdf) | --
+Tue 9/7 | 1. Intro to modern data mining | Data wrangling | R4DS Ch. 9-12,15 | [Programming material (R Markdown)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-1/unit-1-lecture-3.Rmd);<br />[Programming material (PDF)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-1/unit-1-lecture-3.pdf) | --
+Thu 9/9 | 1. Intro to modern data mining | Exploratory data analysis | R4DS Ch. 2,3,5,7 | TBA | --
+Tue 9/14 | 1. Intro to modern data mining | Unit 1 Review | -- | TBA | Quiz 1 in class;<br /> ([Quiz 1 from last semester](https://canvas.upenn.edu/courses/1597404/quizzes/2651229))
 Thu 9/16 | 2. Tuning predictive models | Model complexity | ISLRv1 pp. 265-268, 270-276 / ISLRv2 pp. 289-292, 294-300| TBA | --
+Sun 9/19| -- | -- | -- | -- | [Homework 1](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-1/HW1.pdf) due at 11:59pm
 Tue 9/21 | 2. Tuning predictive models | Bias-variance trade-off | ISLR pp. 30-36 | TBA | --
 Thu 9/23 | 2. Tuning predictive models | Cross-validation | ISLR Ch. 5.1 | TBA | --
 Tue 9/28 | 2. Tuning predictive models | Classification | ISLRv1 pp. 127-130 / ISLRv2 pp. 129-132 | TBA | --
 Thu 9/30 | 2. Tuning predictive models | Unit 2 Review | -- | TBA | Quiz 2 in class
-Sun 10/3 | -- | -- | -- | -- | Homework 2 due at 11:59pm
+Mon 10/4 | -- | -- | -- | -- | Homework 2 due at 11:59pm
 Tue 10/5 | 3. Regression-based methods | Logistic regression | ISLR Ch. 4.3 | TBA | --
 Thu 10/7 | 3. Regression-based methods | Regression in high dimensions | ISLR Ch. 6.4 | TBA | --
 Tue 10/12 | 3. Regression-based methods | Ridge regression | ISLR Ch. 6.2.1, 6.2.3 | TBA | --
 Thu 10/14 | -- | Fall break | -- | -- | --
 Tue 10/19 | 3. Regression-based methods | Lasso regression | ISLR Ch. 6.2.2 | TBA | --
 Thu 10/21 | 3. Regression-based methods | Unit 3 Review | -- | TBA | Quiz 3 in class
-Fri 10/22 | -- | Midterm review session (5:15-6:45pm) | -- | TBA | --
+Fri 10/22 | -- | Midterm review session (5:15-6:45pm in JMHH F85) | -- | TBA | --
 Sun 10/24 | -- | -- | -- | -- | Homework 3 due at 11:59pm
 Mon 10/25 | -- | -- | -- | -- | Midterm exam (7-9pm)
 Tue 10/26 | -- | Midterm solutions and final project intro | -- | TBA | --
@@ -62,12 +62,3 @@ Tue 12/7 | 5. Deep learning | Unit 5 Review | -- | TBA | Quiz 5 in class
 Wed 12/8 | -- | -- | -- | -- | Homework 5 due at 11:59pm
 Thu 12/9 | -- | Course wrap-up | -- | TBA | --
 Sun 12/19 | -- | -- | -- | -- | Final project due at 11:59pm
-
-
-
-
-
-
-
-
-

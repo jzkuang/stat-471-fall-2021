@@ -1,0 +1,87 @@
+---
+title: "Running a linear regression in R"
+date: "September 2, 2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+Today, we will learn how to run a linear regression in `R`, examine the output, and add the regression line to a scatter plot. As an example, we will use the advertising data from the lecture video.
+
+```{r, warning = FALSE, message = FALSE}
+# load the data
+library(tidyverse)
+advertising_data = read_csv("../../data/Advertising.csv", col_types = "-dddd") 
+advertising_data
+```
+
+# Running a linear regression
+
+The function in `R` to run a linear regression is `lm()`, which stands for "linear model." Below is an example of a simple linear regression:
+```{r}
+lm_fit = lm(formula = sales ~ TV, data = advertising_data)
+```
+
+The `formula` argument is used to specify the response variable and the features to use in the regression. In general, the syntax is 
+<center> `response ~ feature_1 + feature_2 + ... + feature_p`. </center>
+
+An intercept term is included by default, unless it is suppressed using the `-1` syntax. Here are some examples of formulas:
+
+  * **Simple linear regression.** 
+    - Formula: `sales ~ TV`
+    - Meaning: $\text{sales} \approx \beta_0 + \beta_1 \times \text{TV}$
+  * **Removing the intercept.** 
+    - Formula: `sales ~ TV - 1` 
+    - $\text{sales} \approx \beta_1 \times \text{TV}$
+  * **Multiple linear regression.** 
+    - Formula: `sales ~ TV + newspaper + radio` 
+    - Meaning: $\text{sales} \approx \beta_0 + \beta_1 \times \text{TV} + \beta_2 \times \text{newspaper} + \beta_3 \times \text{radio}$
+  * **Using all other variables in data frame as features.** 
+    - Formula: `sales ~ .`
+    - Meaning: $\text{sales} \approx \beta_0 + \beta_1 \times \text{TV} + \beta_2 \times \text{newspaper} + \beta_3 \times \text{radio}$
+
+# Inspecting the output
+
+Let's run a regression of `sales` on each of the three other variables:
+```{r}
+lm_fit = lm(formula = sales ~ ., data = advertising_data)
+```
+
+The object `lm_fit` now contains all the information about the linear regression. We can get a preview as follows:
+```{r}
+lm_fit
+```
+This prints out the fitted coefficients. We can extract the coefficients into a vector as follows:
+```{r}
+coefs = lm_fit$coefficients
+coefs
+```
+`coefs` is a vector of length 4, and we can operate on it as usual, e.g. subset it:
+```{r}
+coefs[2:4]
+```
+The entries of the vector also have names, so we can subset the vector based on these names as well:
+```{r}
+coefs[c("TV", "radio", "newspaper")]
+```
+You can extract lots of other information from the `lm_fit` object, such as the residuals and the fitted values. To get even more information, type `summary(lm_fit)`:
+```{r}
+summary(lm_fit)
+```
+
+We'll talk in more depth about interpreting this output in the next lecture, but for now observe that the $R^2$ can be extracted from the summary as follows:
+```{r}
+summary(lm_fit)$r.squared
+```
+
+
+# Adding the regression line to a plot
+The easiest way to add a (simple) regression line to a plot is by calling `geom_smooth()`:
+```{r, fig.width = 4, fig.height = 4}
+advertising_data %>%
+  ggplot(aes(x = TV, y = sales)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme_bw()
+```
