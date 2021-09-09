@@ -8,3 +8,5 @@
 git-and-github.key
 *.aux
 *.html
+.Rhistory
+/*/.Rhistory
