@@ -39,18 +39,72 @@ library(tidyverse)
 ```{r}
 # read in the data and data dictionary
 who_raw = read_csv("https://extranet.who.int/tme/generateCSV.asp?ds=notifications")
+
+who_raw
+
 who_dictionary = read_csv("https://extranet.who.int/tme/generateCSV.asp?ds=dictionary")
+
+who_dictionary %>% select(-dataset, -code_list)
+
 
 # subset columns to reduce complexity (for the purposes of this class)
 who = who_raw %>% select(colnames(tidyr::who))
 
-# subset data dictionary 
-who_dictionary %>% filter(variable_name %in% colnames(who)) %>% select(-dataset, -code_list)
+who_tidy = who %>% 
+  select(-iso2, -iso3) %>%
+  pivot_longer(-c(country, year), 
+               names_to = "col_names", 
+               values_to = "cases") %>%
+  mutate(col_names = stringr::str_replace(col_names, "newrel", "new_rel")) %>%
+  separate(col_names, into = c("new", "type", "sexage"), sep = "_") %>%
+  select(-new) %>%
+  separate(sexage, into = c("sex", "age"), sep = 1)
+
+who_tidy = who_tidy %>% filter(!is.na(cases))
+
+who_tidy
 ```
 
 # Data exploration
 
+```{r}
+who_tidy %>%
+  group_by(sex) %>%
+  summarise(total_cases = sum(cases))
+
+who_tidy %>%
+  group_by(year, sex) %>%
+  summarise(total_cases = sum(cases)) %>%
+  ungroup() %>%
+  ggplot(mapping = aes(x = year, y = total_cases)) + 
+  geom_point() +
+  geom_line() + 
+  facet_wrap(~sex) +
+  theme_bw()
+
+who_tidy %>%
+  group_by(country) %>%
+  summarise(total_cases = sum(cases)) %>%
+  arrange(desc(total_cases))
+```
+
+
 # Data modeling
 
+```{r}
+cases_by_year = who_tidy %>%
+  group_by(year) %>%
+  summarise(total_cases = sum(cases)) %>%
+  filter(year >= 1995)
+
+cases_by_year %>%
+  ggplot(aes(x = year, y = log(total_cases))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme_bw()
+
+lm_fit = lm(log(total_cases) ~ year, data = cases_by_year)
+summary(lm_fit)
+```
 
 
