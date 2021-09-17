@@ -174,7 +174,22 @@ ggplot() +
 
 1. Create 500 training data points $(X, Y)$ as follows. First, generate 500 equally spaced values of `x` between 0 and 1 (using the `seq` function). Then, sample a vector `y` based on $Y = f(X) + \epsilon$, where $\epsilon \sim N(0, \sigma^2)$ and $\sigma = 2$. Put `x` and `y` into a tibble called `data`.
 
+```{r}
+data <- tibble(seq(0, 1, length.out = 500)) %>% 
+  rename("x" = 1) %>% 
+  mutate(funct = f(x),
+         eps = rnorm(500, 0, 2),
+         y = funct + eps)
+
+```
+
 2. Create a scatter plot of these data, overlaying the function `f` in red.
+
+```{r}
+ggplot(data, aes(x = x, y = y)) +
+  geom_point()
+```
+
 
 3. Take a look at what natural spline fits look like for this data, using different degrees of freedom. Using `geom_smooth()`, plot natural spline fits with degrees of freedom equal to 2,10,25,50 (use separate plots for each value of df). For each of these plots, superimpose the true trend as a red line. Comment on what happens as you increase the degrees of freedom. Which of these four values seems to fit the scatter plot best? 
 
