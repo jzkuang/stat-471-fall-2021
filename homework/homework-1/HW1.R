@@ -35,12 +35,24 @@ mlb_aggregate_joined <- mlb_aggregate %>% # Creating a merged tibble
 payroll_comparison <- ggplot(mlb_aggregate_joined, # Plotting the computed vs actual payroll values
                              aes(x= payroll_aggregate_computed, y = payroll_aggregate)) +
   geom_point() +
-  geom_abline(slope=1, intercept= 0) #Adding the 45 degree line
-pct_wins_comparison <- ggplot(mlb_aggregate_joined, # Plotting the computed vs actual pctwin values
+  geom_abline(slope=1, intercept= 0) + #Adding the 45 degree line
+  theme_bw() + # Setting a nice theme
+  labs(x = "Computed Payroll Aggregate Value", # Adding informative axis labels
+       y = "Given Payroll Aggregate Value")
+
+pct_wins_comparison <- ggplot(mlb_aggregate_joined, # Plotting the computed vs actual pct_win values
                              aes(x= pct_wins_aggregate_computed, y = pct_wins_aggregate)) +
   geom_point() +
-  geom_abline(slope=1, intercept= 0) #Adding the 45 degree line
-payroll_comparison
+  geom_abline(slope=1, intercept= 0) + #Adding the 45 degree line
+  theme_bw() + # Setting a nice theme
+  labs(x = "Computed Aggregate Win Rate", # Adding informative axis labels
+       y = "Given Aggregate Win Rate") +
+  scale_x_continuous(breaks = c(0.4, 0.5, 0.6), # Setting my own custom scales for the axises
+                     limits = c(0.4, 0.65)) +
+  scale_y_continuous(breaks = c(0.4, 0.45, 0.5, 0.55, 0.6),
+                     limits = c(0.4, 0.6))
+plot_grid(payroll_comparison, pct_wins_comparison, # Plotting the two graphs side by side
+          align = "h")
 #### 2 ####
 ## 2.1 ##
 mlb_aggregate_computed <- mlb_aggregate_computed %>% # Calculate the average payroll
@@ -50,6 +62,7 @@ ggplot(mlb_yearly, aes(x = year, y = payroll)) + # Plot the payroll by year
   facet_wrap(team ~ .) + # Facet this graph by teams
   geom_hline(mlb_aggregate_computed, # Add the dashed, red lines of the mean payroll to each graph
              mapping = aes(yintercept = average_payroll), linetype='dashed', col = 'red') +
+  theme_bw() + # Use the black and white theme
   theme(axis.text.x = element_text(
     angle = 90, size = 7.5, vjust = 0.5, hjust=.9)) # A little theme working to make it better
 
