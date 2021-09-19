@@ -160,7 +160,7 @@ mlb_aggregate_joined <- mlb_aggregate %>% # Creating a merged tibble
   merge(mlb_aggregate_computed)
 ```
 
-```{r plotting-comparisons, fig.width=6, fig.height=6, fig.align="center", out.width = "60%"}
+```{r plotting-comparisons, fig.width=8, fig.height= 4, fig.align="center", out.width = "85%"}
 # Plotting the computed vs actual payroll values
 payroll_comparison <- ggplot(mlb_aggregate_joined, 
                              aes(x= payroll_aggregate_computed, y = payroll_aggregate)) +
@@ -171,7 +171,8 @@ payroll_comparison <- ggplot(mlb_aggregate_joined,
        y = "Given Payroll Aggregate (Billions USD)")
 # Plotting the computed vs actual pct_win values
 pct_wins_comparison <- ggplot(mlb_aggregate_joined, 
-                             aes(x= pct_wins_aggregate_computed, y = pct_wins_aggregate)) +
+                             aes(x= pct_wins_aggregate_computed, 
+                                 y = pct_wins_aggregate)) +
   geom_point() +
   geom_abline(slope=1, intercept= 0) + #Adding the 45 degree line
   theme_bw() + # Setting a nice theme
@@ -204,19 +205,22 @@ Now that the data are in tidy format, we can explore them by producing visualiza
 
 [Hint: To compute payroll increase, it's useful to `pivot_wider` the data back to a format where different years are in different columns. Use `names_prefix = "payroll_` inside `pivot_wider` to deal with the fact column names cannot be numbers. To add different horizontal lines to different facets, see [this webpage](https://community.rstudio.com/t/how-to-add-different-horizontal-lines-to-different-facets/20871).]
 
-```{r team-payrolls, fig.width=9, fig.height=9, fig.align="center", out.width = "80%"}
+```{r team-payrolls, fig.width=11, fig.height=11, fig.align="center", out.width = "100%"}
 mlb_aggregate_computed <- mlb_aggregate_computed %>% # Calculate the average payroll
   mutate(average_payroll = payroll_aggregate_computed/17 * 1000)
 ggplot(mlb_yearly, aes(x = year, y = payroll)) + # Plot the payroll by year
   geom_point() +
+  scale_x_discrete(breaks=seq(1998, 2014, 2)) +
   facet_wrap(team ~ .) + # Facet this graph by teams
   # Add the dashed, red lines of the mean payroll to each graph
   geom_hline(mlb_aggregate_computed, 
-             mapping = aes(yintercept = average_payroll), linetype='dashed', col = 'red') +
+             mapping = aes(yintercept = average_payroll), 
+             linetype='dashed', col = 'red') +
   theme_bw() + # Use the black and white theme
   theme(axis.text.x = element_text(# A little theme working to make it better
-    angle = 90, size = 7.5, vjust = 0.5, hjust=.9)) +  
-  labs(y = "Team Payroll", x = "Year")
+    angle = 90, vjust = 0.5, hjust=.9),
+    text = element_text(size = 14)) +  
+  labs(y = "Team Payroll (Millions USD)", x = "Year")
 ```
 **The three teams with the greatest payroll:**
 ```{r greatest-payroll}
@@ -234,14 +238,18 @@ mlb_aggregate_computed %>% #Getting the three highest payroll teams
 **The three teams with the greatest percentage increases in payroll:**
 ```{r greatest-payroll-increase}
 mlb_yearly %>% 
-  select(c(team, year, payroll)) %>% # Get only the columns needed to find the greatest increase
+  # Get only the columns needed to find the greatest increase
+  select(c(team, year, payroll)) %>% 
   # Pivoting it wider to make it easier to calculate the increase
   pivot_wider(names_from = year, values_from = c(payroll), names_prefix = "payroll_") %>% 
-  mutate(pct_increase = 
-           (payroll_2004 - payroll_1998)/payroll_1998 * 100) %>% #Calculating the increase
-  arrange(desc(pct_increase)) %>% # Arranging the data from highest to lowest payroll increase
+  mutate(pct_increase = #Calculating the increase
+           (payroll_2004 - payroll_1998)/payroll_1998 * 100) %>% 
+  # Arranging the data from highest to lowest payroll increase
+  arrange(desc(pct_increase)) %>% 
   select(team, payroll_1998, payroll_2014, pct_increase) %>% 
-  rename(Team = team, "Percentage Increase in Payroll" = pct_increase) %>% 
+  rename(Team = team, "% Increase in Payroll" = pct_increase,
+         "Payroll 1998 (Millions $)" = payroll_1998, 
+         "Payroll 2014 (Millions $)" = payroll_2014) %>% 
   slice(1:3) %>% # Getting the top 3
   kable(format = "latex", row.names = NA,
         booktabs = TRUE, digits = 2,
@@ -264,7 +272,7 @@ mlb_yearly %>%
 
 - How are the metrics `payroll_aggregate_computed` and `pct_wins_sd` reflected in the plot above, and how can we see that the two sets of teams identified above are the top three in terms of these metrics?
 
-```{r team-pct-wins, fig.width=9, fig.height=9, fig.align="center", out.width = "80%"}
+```{r team-pct-wins, fig.width= 11, fig.height= 11, fig.align="center", out.width = "100%"}
 mlb_average_winrate <- mlb_yearly %>% # Calculating the average win rate for each team
   group_by(team) %>% 
   summarise(avg_winrate = mean(pct_wins), # The average win rate
@@ -278,13 +286,15 @@ ggplot(mlb_yearly, aes(x = year, y = pct_wins)) + # Plot the win rate by year
              mapping = aes(yintercept = avg_winrate), linetype='dashed', col = 'red') +
   theme_bw() +
   theme(axis.text.x = # A little theme working to make it better
-    element_text(angle = 90, size = 9, vjust = 0.5, hjust=.9)) + 
+    element_text(angle = 90, vjust = 0.5, hjust=.9),
+    text = element_text(size = 14)) + 
   labs(y = "Win Rate", x = "Year") 
 ```
 **The three teams with the greatest win rate:**
 ```{r greatest-win-rate}
 mlb_aggregate %>% #Getting the three highest teams
-  arrange(desc(pct_wins_aggregate)) %>%  # Arrange them from highest to lowest aggregate payroll
+ # Arrange them from highest to lowest aggregate payroll
+  arrange(desc(pct_wins_aggregate)) %>% 
   select(c("team", "pct_wins_aggregate")) %>% 
   rename(Team = team, "Win Rate" = pct_wins_aggregate) %>% 
   slice(1:3) %>%  # Get the top 3
@@ -296,7 +306,8 @@ mlb_aggregate %>% #Getting the three highest teams
 **The three teams with the most erratic win rate:**
 ```{r most-erratic-win-rate}
 mlb_average_winrate %>% #Getting the three highest teams
-  arrange(desc(pct_wins_sd)) %>%  # Arrange them from highest to lowest aggregate payroll
+  # Arrange them from highest to lowest aggregate payroll
+  arrange(desc(pct_wins_sd)) %>%
   select(c("team", "pct_wins_sd")) %>% 
   rename(Team = team, "SD of Win Rate" = pct_wins_sd) %>% 
   slice(1:3) %>%  # Get the top 3
@@ -319,17 +330,18 @@ The analysis goal is to study the relationship between win percentage and payrol
 
 - Is the relationship between `payroll` and `pct_wins` positive or negative? Is this what you would expect, and why? 
 
-```{r payroll-vs-winrate, fig.width=5, fig.height=5, fig.align="center", out.width = "30%"}
+```{r payroll-vs-winrate, fig.width= 5, fig.height= 5, fig.align="center", out.width = "60%"}
 # Creating the aesthetic for the payroll vs pct wins graph
 ggplot(data = mlb_aggregate, aes(x=payroll_aggregate, y = pct_wins_aggregate)) +
   geom_point() + # Adding the points
   geom_text_repel(aes(label = team), # Adding the labels
                   # Adjusting some settings to make it look better
-                  box.padding = 0.6, size = 3, max.overlaps = 20, min.segment.length = 0.2,
+                  box.padding = 0.6, size = 3, max.overlaps = 20, 
+                  min.segment.length = 0.2,
                   force = 4) + 
   geom_smooth(method='lm', se= FALSE) + # Adding the least squares line 
   theme_bw() +
-  labs(x = "Aggregate Payroll", y = "Aggregate Win Rate")
+  labs(x = "Aggregate Payroll (Billion USD)", y = "Aggregate Win Rate")
 ```
 
 **The relationship between payroll and win_rate is positive, which makes sense as more money **
@@ -350,8 +362,10 @@ mlb_aggregate <- mlb_aggregate %>%
   mutate(efficiency = pct_wins_aggregate/payroll_aggregate)
 #Getting the three highest efficiency teams
 mlb_aggregate %>% 
-  arrange(desc(efficiency)) %>%  # Arrange them from highest to lowest aggregate payroll
+  # Arrange them from highest to lowest aggregate payroll
+  arrange(desc(efficiency)) %>%  
   select(c("team", "efficiency")) %>% 
+  rename(Team = team, Efficiency = efficiency) %>% 
   slice(1:3) %>%  # Get the top 3 
   kable(format = "latex", row.names = NA,
         booktabs = TRUE, digits = 2,
