@@ -1,0 +1,356 @@
+---
+title: 'Unit 2 Lecture 2: Bias-variance tradeoff'
+date: "September 21, 2021"
+output: pdf_document
+---
+
+```{r, echo = FALSE, message = FALSE}
+library(tidyverse)
+library(modelr)    # might need to install first
+library(cowplot)
+```
+
+In this R demo, we will explore the bias-variance tradeoff in the context of natural spline fits.
+
+As our true function $f$, let us use the following sine curve:
+```{r}
+f = function(x)(sin(3*x))
+ggplot() + 
+  stat_function(fun = f, colour = "blue", size = 1) + 
+  xlim(0,2*pi) + theme_bw()
+```
+
+# Training and testing
+
+Let us start with the function `f`. Let us create a training set 
+```{r}
+set.seed(1)
+n = 50
+sigma = 1
+train_data = tibble(x = seq(0, 2*pi, length.out = n),
+                       y = f(x) + rnorm(n, sd = sigma))
+train_data
+train_data %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point() + 
+  stat_function(fun = f, colour = "blue", size = 1) + 
+  theme_bw() 
+```
+
+Let us train a natural spline fit with 5 degrees of freedom on this data:
+```{r}
+spline_fit = lm(y ~ splines::ns(x, df = 5), data = train_data)
+train_data %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point() + 
+  stat_function(fun = f, aes(colour = "Truth"), size = 1) + 
+  geom_smooth(method = "lm", 
+              formula = "y ~ splines::ns(x, df = 5)",
+              aes(colour = "Fit"), se = FALSE) + 
+  scale_colour_manual(values = c("red", "blue")) +
+  theme_bw() + theme(legend.title = element_blank())
+```
+
+Next, we compute the training and test error for this fit:
+```{r}
+### training error
+y_hat_train = predict(spline_fit, newdata = train_data)
+head(y_hat_train)
+
+train_data %>% 
+    mutate(y_hat_train = y_hat_train) %>% 
+    summarise(training_error = mean((y_hat_train-y)^2))
+```
+
+```{r}
+### test error
+
+# create a large test set
+N = 50000
+test_data = tibble(x = seq(0, 2*pi, length.out = N),
+                   y = f(x) + rnorm(n, sd = sigma))
+
+# compute test error
+y_hat_test = predict(spline_fit, newdata = test_data)
+test_data %>% 
+    mutate(y_hat_test = y_hat_test) %>% 
+    summarise(test_error = mean((y_hat_test-y)^2))
+```
+
+# Varying the degrees of freedom
+
+Next let's do the same thing, but for `df` varying between 1 and 15.
+
+```{r}
+max_df = 15
+error_test = numeric(max_df)
+error_train = numeric(max_df)
+for(df in 1:max_df){
+  formula = sprintf("y ~ splines::ns(x, df = %d)", df)
+  spline_fit = lm(formula = formula, data = train_data)
+  y_hat_train = predict(spline_fit, newdata = train_data)
+  y_hat_test = predict(spline_fit, newdata = test_data)
+  error_train[df] = train_data %>% 
+    cbind(y_hat_train) %>% 
+    summarise(mean((y_hat_train-y)^2)) %>% 
+    pull()
+  error_test[df] = test_data %>% 
+    cbind(y_hat_test) %>% 
+    summarise(mean((y_hat_test-y)^2)) %>% 
+    pull()
+}
+
+tibble(df = 1:max_df, error_train, error_test) %>% 
+  pivot_longer(cols = -df, names_to = "set", 
+               names_prefix = "error_",values_to = "error") %>%
+  ggplot(aes(x = df, y = error, color = set)) + 
+  geom_point() + geom_line() + theme_bw()
+```
+What is the best choice for `df`? 
+
+Let's visualize a few of these fits to see if these train and test errors make sense:
+```{r}
+train_data %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point() + 
+  stat_function(fun = f, aes(colour = "Truth"), size = 1) + 
+  geom_smooth(method = "lm", 
+              formula = "y ~ splines::ns(x, df = 2)",
+              aes(colour = "Fit"), se = FALSE) + 
+  scale_colour_manual(values = c("red", "blue")) +
+  theme_bw() + theme(legend.title = element_blank())
+```
+Does the best choice of `df` from before make sense?
+
+# Fitting splines to many random training sets
+
+Recall that the expected test error, bias, and variance are quantities averaged over the randomness in the training data. Therefore, let us repeatedly generate the training data to compute them in the above example.
+```{r}
+resamples = 100
+train_data_resamples = tibble(x = rep(seq(0, 2*pi, length.out = n), resamples),
+                       y = f(x) + rnorm(n*resamples, sd = sigma),
+                       resample = rep(1:resamples, each = n))
+```
+ 
+Next, let us fit the natural spline model with 5 degrees of freedom to each resampled dataset:
+```{r}
+# function that fits a degree 5 natural spline
+spline_model_5_df = function(data) {
+  lm(y ~ splines::ns(x, df = 5), data = data)
+}
+
+# fit the natural spline to each resampled dataset
+training_results = train_data_resamples %>% 
+  group_by(resample) %>%                                   # group by resample
+  nest() %>%                                               
+  mutate(model = map(data, spline_model_5_df)) %>%         # fit each model
+  mutate(fitted = map2(data, model, add_predictions)) %>%  # add predictions
+  select(resample, fitted) %>%
+  unnest(fitted) %>%
+  ungroup()
+
+training_results
+```
+
+Let's plot the first ten of these fits:
+
+```{r, echo = FALSE}
+p = training_results %>% 
+  filter(resample <= 10) %>%
+  ggplot(aes(x = x, y = pred)) + 
+  geom_line(aes(colour = "Training fits", 
+                alpha = "Training fits", 
+                linetype = "Training fits", 
+                group = resample), 
+            size = 1) + 
+  stat_function(fun = f, 
+                aes(colour = "True function", 
+                    alpha = "True function", 
+                    linetype = "True function"), 
+                size = 1) + 
+  scale_colour_manual(name = "legend", values = c("blue", "red", "red"), 
+                      breaks = c("True function", 
+                                 "Training fits", 
+                                 "Mean training fit")) +   
+  scale_linetype_manual(name = "legend", values = c("solid", "solid", "dashed"), 
+                      breaks = c("True function", 
+                                 "Training fits", 
+                                 "Mean training fit")) +
+  scale_alpha_manual(name = "legend", values = c(1,0.25,1), 
+                      breaks = c("True function", 
+                                 "Training fits", 
+                                 "Mean training fit")) +
+  xlab("x") + ylab("y") +
+  theme_bw() + theme(legend.title = element_blank(), legend.position = "top")
+plot(p)
+```
+
+# Bias, variance, and expected test error
+
+## Separately for each data point
+Let's compute the mean prediction, bias, and variance for each value of `x` by averaging over the resamples:
+```{r}
+training_results_summary = training_results %>% 
+  mutate(true_fit = f(x)) %>%
+  group_by(x) %>% 
+  summarise(mean_pred = mean(pred), 
+            bias = mean(pred - true_fit),
+            variance = var(pred))
+training_results_summary
+```
+
+Let us plot these and see what we get:
+
+```{r, echo = FALSE, fig.width = 6, fig.height = 4.5}
+p = p + geom_line(aes(x = x, y = mean_pred,
+                      colour = "Mean training fit", 
+                      alpha = "Mean training fit", 
+                      linetype = "Mean training fit"), 
+                  size = 1,
+                  data = training_results_summary)
+
+p_bias = training_results_summary %>%
+  ggplot(aes(x = x, y = bias)) +
+  geom_line() + geom_hline(yintercept = 0, linetype = "dashed") + 
+  theme_bw()
+
+p_variance = training_results_summary %>%
+  ggplot(aes(x = x, y = variance)) +
+  geom_line() + theme_bw()
+
+plot_grid(p, p_bias, p_variance, rel_heights = c(2.5,1,1), nrow = 3)
+```
+
+How do we interpret the bias in terms of the first plot above? When is it above zero and when is it below zero? 
+
+How do we interpret the variance in terms of the first plot above? Why is it larger at the edges of the data?
+
+## Overall bias, variance, and ETE
+
+To get the overall squared bias and variance, we average across data points:
+```{r}
+bias_variance = training_results_summary %>%
+  summarize(sq_bias = mean(bias^2), 
+            variance = mean(variance),
+            irreducible_error = sigma^2)
+bias_variance
+```
+Based on this information, how do we compute expected test error?
+```{r, eval = F}
+bias_variance %>% mutate(expected_test_error = ???)
+```
+
+## Sanity check 1: does the variance match the formula?
+
+What is the formula for overall variance of the fit for a linear regression model?
+```{r, eval = F}
+# formula for mean variance:
+variance_formula = ???
+```
+Does this match the variance obtained above?
+
+## Sanity check 2: does ETE match the definition?
+
+Let us calculate the ETE from its definition by generating test points:
+```{r}
+training_results %>% 
+  mutate(y_test = f(x) + rnorm(n*resamples, sd = sigma)) %>%
+  group_by(resample) %>%
+  summarise(test_error = mean((pred - y_test)^2)) %>%
+  summarise(expected_test_error = mean(test_error))
+```
+Does this quantity match the ETE computed above?
+
+# Varying the degrees of freedom
+
+Next let's do the same thing, but for `df` varying between 1 and 15. We wrap everything in a function for convenience:
+
+```{r}
+bias_variance_tradeoff = function(f, sigma, n, resamples){
+  # set seed for reproducibility
+  set.seed(1)
+  
+  # generate training data
+  train_data_resamples = tibble(x = rep(seq(0, 2*pi, length.out = n), resamples),
+                       y = f(x) + rnorm(n*resamples, sd = sigma),
+                       resample = rep(1:resamples, each = n))
+  
+  # function that fits a degree `df` natural spline to `data`
+  spline_model = function(data, df) {
+    lm(y ~ splines::ns(x, df = df), data = data)
+  }
+
+  # fit natural spline of each df to each resampled dataset
+  training_results = train_data_resamples %>% 
+    crossing(df = 1:15) %>%
+    group_by(resample, df) %>%
+    nest() %>%
+    mutate(model = map2(data, df, spline_model)) %>%
+    mutate(fitted = map2(data, model, add_predictions)) %>%
+    select(resample, df, fitted) %>%
+    unnest(fitted) %>%
+    ungroup()
+    
+  # compute bias, variance, and ETE
+  training_results_summary = training_results %>%
+    mutate(true_fit = f(x)) %>%
+    group_by(df, x) %>% 
+    summarise(bias = mean(pred - true_fit),
+              variance = var(pred)) %>%
+    summarise(mean_sq_bias = mean(bias^2),
+              mean_variance = mean(variance)) %>%
+    mutate(expected_test_error = mean_sq_bias + mean_variance + sigma^2)
+    
+  # plot the bias, variance, and ETE
+  p = training_results_summary %>% 
+    pivot_longer(-df, names_to = "metric", values_to = "error") %>%
+    ggplot(aes(x = df, y = error, colour = metric)) + 
+    geom_line() + geom_point() + theme_bw()
+  plot(p)
+}
+```
+
+Let's try out this function on the example from before:
+```{r}
+f = function(x)(sin(3*x))
+sigma = 1
+n = 50
+resamples = 100
+bias_variance_tradeoff(f, sigma, n, resamples)
+```
+
+What trends do we observe in this plot? What appears to be the best degrees of freedom? Why does the variance curve appear linear? What does it mean that the bias is zero from `df` = 8 onwards?
+
+# Varying the noise level
+
+What happens if we increase the noise standard deviation? What happens if we decrease it?
+```{r}
+# try increasing noise level
+```
+
+
+```{r}
+# try decreasing noise level
+```
+
+# Varying the sample size
+
+What happens if we decrease the sample size? What happens if we increase it?
+```{r}
+# try decreasing sample size
+```
+```{r}
+# try increasing sample size
+```
+
+# Varying the complexity of the underlying function
+
+What happens if we decrease the complexity of the underlying function `f`? What happens if we increase it?
+
+```{r}
+# try decreasing complexity of f
+```
+
+```{r}
+# try increasing complexity of f
+```
