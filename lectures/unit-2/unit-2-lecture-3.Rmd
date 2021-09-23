@@ -1,0 +1,266 @@
+---
+title: 'Unit 2 Lecture 3: Cross-validation'
+date: "September 23, 2021"
+output: pdf_document
+---
+
+```{r, echo = FALSE, message = FALSE}
+library(tidyverse)
+```
+
+In this R demo, we will implement cross-validation to select the degrees of freedom of a natural spline fit, using the running example from the previous class.
+
+# Training and validation
+
+Let us create a training set:
+```{r}
+set.seed(1)
+f = function(x)(sin(3*x))
+n = 50
+sigma = 1
+train_data = tibble(x = seq(0, 2*pi, length.out = n),
+                       y = f(x) + rnorm(n, sd = sigma))
+train_data
+```
+
+Let's also suppose we have a large validation set on our hands:
+```{r}
+N = 50000
+validation_data = tibble(x = seq(0, 2*pi, length.out = N),
+                   y = f(x) + rnorm(n, sd = sigma))
+```
+
+Now let's fit splines with `df` = 1,2,...,15 to the training data, and evaluate their test error using the test set:
+
+```{r}
+# compute the validation error
+max_df = 15
+validation_error = numeric(max_df)
+df = 1
+for(df in 1:max_df){
+  formula = sprintf("y ~ splines::ns(x, df = %d)", df)
+  spline_fit = lm(formula = formula, data = train_data)
+  y_hat_validation = predict(spline_fit, newdata = validation_data)
+  validation_error[df] = validation_data %>% 
+    cbind(y_hat_validation) %>% 
+    summarise(mean((y_hat_validation-y)^2)) %>% 
+    pull()
+}
+validation_error
+
+# plot the validation error
+p_val = tibble(df = 1:max_df, validation_error) %>% 
+  ggplot(aes(x = df, y = validation_error)) + 
+  geom_point() + geom_line() + 
+  xlab("Degrees of freedom") +
+  ylab("Validation error") + theme_bw()
+plot(p_val)
+```
+
+The issue is that we usually do not have a giant validation set for model selection purposes. We need to make do with our smallish training set for both model training and model selection. This is where cross-validation comes in handy!
+
+# Cross-validation for df = 5
+
+The idea is to split our training samples into *folds* and then have the folds take turns being the validation set. Let's take a look.
+
+```{r}
+K = 10
+folds = sample(rep(1:K, n/K))
+train_data = train_data %>% bind_cols(tibble(fold = folds))
+train_data
+```
+Question: How would we select the data in fold number 1? How would we select all the data except fold number 1?
+
+Let's first use cross-validation to estimate the test error for a spline fit with 5 degrees of freedom.
+```{r}
+# create a vector of out-of-fold predictions
+out_of_fold_predictions = numeric(n)
+
+# iterate over folds
+for(current_fold in 1:K){
+  # out-of-fold data will be used for training
+  out_of_fold_data = train_data %>% filter(fold != current_fold)
+  # in-fold data will be used for validation
+  in_fold_data = train_data %>% filter(fold == current_fold)
+  
+  out_of_fold_data
+  in_fold_data
+  
+  # train on out-of-fold data
+  spline_fit = lm(y ~ splines::ns(x, df = 5), data = out_of_fold_data)
+  
+  # predict on in-fold data
+  out_of_fold_predictions[folds == current_fold] = 
+    predict(spline_fit, newdata = in_fold_data)
+}
+
+# add the out-of-fold predictions to the data frame
+results = train_data %>% 
+  bind_cols(yhat = out_of_fold_predictions)
+results
+
+# compute the CV estimate and standard error
+results %>% 
+  group_by(fold) %>% 
+  summarise(cv_fold = mean((yhat-y)^2)) %>%  # CV estimates per fold
+  summarise(cv_mean = mean(cv_fold),         
+            cv_se = sd(cv_fold)/sqrt(K))   
+```
+What are two reasons this CV estimate may be different from the validation error estimated above?
+
+# Cross-validation for df = 1,2,...,15
+
+Now let's repeat what we did above for many degrees of freedom, because after all, the point of cross-validation is to choose the degrees of freedom.
+
+```{r, fig.width = 6, fig.height = 5}
+# create a matrix for out-of-fold predictions
+out_of_fold_predictions = matrix(0, n, max_df) %>% 
+  as_tibble() %>%
+  setNames(paste0('y_hat_', 1:max_df))
+
+# iterate over folds
+for(current_fold in 1:K){
+  # out-of-fold data will be used for training
+  out_of_fold_data = train_data %>% filter(fold != current_fold)
+  # in-fold data will be used for validation
+  in_fold_data = train_data %>% filter(fold == current_fold)
+  
+  # iterate over df
+  for(df in 1:15){
+    # train on out-of-fold data
+    formula = sprintf("y ~ splines::ns(x, df = %d)", df)
+    spline_fit = lm(formula = formula, data = out_of_fold_data)
+    
+    # predict on in-fold data
+    out_of_fold_predictions[folds == current_fold, df] = 
+      predict(spline_fit, newdata = in_fold_data) 
+  }
+}
+
+# add the out-of-fold predictions to the data frame
+results = train_data %>% bind_cols(out_of_fold_predictions)
+results
+
+# compute the CV estimate and standard error
+cv_error = results %>%
+  pivot_longer(-c(x,y,fold), 
+               names_to = "df",
+               names_prefix = "y_hat_",
+               names_transform = list(df = as.integer),
+               values_to = "yhat") %>%
+  group_by(df, fold) %>%
+  summarise(cv_fold = mean((yhat-y)^2)) %>%  # CV estimates per fold
+  summarise(cv_mean = mean(cv_fold),
+            cv_se = sd(cv_fold)/sqrt(K))
+
+cv_error
+
+# plot the results, along with the previously computed validation error
+p_cv = cv_error %>%
+  ggplot(aes(x = df, y = cv_mean, ymin = cv_mean-cv_se, ymax = cv_mean+cv_se)) +
+  geom_point() + geom_line() + geom_errorbar() +
+  geom_hline(aes(yintercept = min(cv_mean)), linetype = "dashed") +
+  xlab("Degrees of freedom") + ylab("CV error") + 
+  theme_bw()
+
+cowplot::plot_grid(p_cv, p_val, nrow = 2)
+```
+
+Based on the one-standard-error rule, what degrees of freedom would we select based on the cross-validation?
+
+Let's wrap this cross-validation procedure into a function:
+```{r}
+cross_validate_spline = function(x, y, nfolds, df_values){
+  # a few checks of the inputs
+  stopifnot(is.vector(x))
+  stopifnot(is.vector(y))
+  stopifnot(length(x) == length(y))
+  
+  # divide training data into folds
+  n = length(x)
+  train_data = tibble(x,y)
+  folds = sample(rep(1:nfolds, length.out = n))
+  train_data = train_data %>% mutate(fold = folds)
+
+  # create a matrix for out-of-fold predictions
+  num_df_values = length(df_values)
+  out_of_fold_predictions = 
+    matrix(0, n, num_df_values) %>% 
+    as_tibble() %>%
+    setNames(paste0('y_hat_', df_values))
+
+  # iterate over folds
+  for(current_fold in 1:nfolds){
+    # out-of-fold data will be used for training
+    out_of_fold_data = train_data %>% filter(fold != current_fold)
+    # in-fold data will be used for validation
+    in_fold_data = train_data %>% filter(fold == current_fold)
+    
+    # iterate over df
+    for(i in 1:num_df_values){
+      df = df_values[i]
+      
+      # train on out-of-fold data
+      formula = sprintf("y ~ splines::ns(x, df = %d)", df)
+      spline_fit = lm(formula = formula, data = out_of_fold_data)
+      
+      # predict on in-fold data
+      out_of_fold_predictions[folds == current_fold, i] = 
+        predict(spline_fit, newdata = in_fold_data) 
+    }
+  }
+  
+  # add the out-of-fold predictions to the data frame
+  results = train_data %>% bind_cols(out_of_fold_predictions)
+  results
+  
+  # compute the CV estimate and standard error
+  cv_table = results %>%
+    pivot_longer(-c(x,y,fold), 
+                 names_to = "df",
+                 names_prefix = "y_hat_",
+                 names_transform = list(df = as.integer),
+                 values_to = "yhat") %>%
+    group_by(df, fold) %>%
+    summarise(cv_fold = mean((yhat-y)^2)) %>%  # CV estimates per fold
+    summarise(cv_mean = mean(cv_fold),
+              cv_se = sd(cv_fold)/sqrt(nfolds))
+  
+  df.1se = cv_table %>% 
+    filter(cv_mean-cv_se <= min(cv_mean)) %>% 
+    summarise(min(df)) %>% 
+    pull()
+  
+  df.min = cv_table %>% 
+    filter(cv_mean == min(cv_mean)) %>% 
+    summarise(min(df)) %>% 
+    pull()
+  
+  # plot the results, along with the previously computed validation error
+  cv_plot = cv_table %>%
+    ggplot(aes(x = df, y = cv_mean, ymin = cv_mean-cv_se, ymax = cv_mean+cv_se)) +
+    geom_point() + geom_line() + geom_errorbar() +
+    geom_hline(aes(yintercept = min(cv_mean)), linetype = "dashed") +
+    xlab("Degrees of freedom") + ylab("CV error") + 
+    theme_bw()
+  
+  # return CV table and plot
+  return(list(cv_table = cv_table, 
+              cv_plot = cv_plot, 
+              df.1se = df.1se, 
+              df.min = df.min))
+}
+
+out = cross_validate_spline(train_data$x, 
+                            train_data$y, 
+                            nfolds = 10, 
+                            df_values = 1:15)
+```
+
+A copy of this function is stored at `stat-471-fall-2021/functions/cross_validate_spline.R`. You'll use it in Homework 2. To "load" the function into your workspace, you need to `source` the above file.
+
+
+Exercise: Use cross-validation and the one-standard error rule to select the optimal number of degrees of freedom for regressing `wage` on `age` in the `Wage` data from the `ISLR2` package. Make the CV plot, and produce a scatter plot of `wage` versus `age` with the optimal spline fit superimposed.
+```{r}
+wage_data = ISLR2::Wage %>% as_tibble()
+```
