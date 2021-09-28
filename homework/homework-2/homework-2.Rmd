@@ -155,10 +155,15 @@ There are clearly some trends in this data, but they are somewhat hard to see gi
 
 To ensure unbiased assessment of predictive models, let's split the data before we start modeling it. 
 
-- Split `bmd` into training (80%) and test (20%) sets. Store these in tibbles called `bmd_train` and `bmd_test`, respectively.
+- Split `bmd` into training (80%) and test (20%) sets, using the rows in `train_samples` below for training. Store these in tibbles called `bmd_train` and `bmd_test`, respectively.
 
 ```{r}
 set.seed(5) # seed set for reproducibility (DO NOT CHANGE)
+n = nrow(bmd)
+train_samples = sample(1:n, round(0.8*n))
+```
+
+```{r splitting}
 picked <- sample(seq_len(nrow(bmd)),size = 485*.8)
 bmd_train <- bmd[picked,] # Creating a train tibble
 bmd_test <- bmd[-picked,] # Creating a test tibble
