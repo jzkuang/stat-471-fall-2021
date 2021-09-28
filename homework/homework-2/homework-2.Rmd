@@ -1,6 +1,6 @@
 ---
 title: 'STAT 471: Homework 2'
-author: 'Name'
+author: 'James Kuang'
 date: 'Due: October 4, 2021 at 11:59pm'
 output:
   bookdown::pdf_document2:
@@ -100,6 +100,12 @@ The goal is to learn about the typical trends of bone mineral density during pub
 - Using `readr`, import the data from the above URL into a tibble called `bmd`. Specify the column types using the `col_types` argument. 
 
 - Print the imported tibble (no need to use `kable`). 
+```{r import-bmd, message = FALSE}
+library(readr) # Read in the data
+bmd <- read_tsv("https://web.stanford.edu/~hastie/ElemStatLearn/datasets/bone.data")
+bmd
+```
+
 
 ## Explore (10 points)
 
@@ -110,6 +116,36 @@ The goal is to learn about the typical trends of bone mineral density during pub
 - Produce boxplots to compare the distributions of `spnbmd` and `age` between boys and girls (display these as two plots side by side, one for `spnbmd` and one for `age`). Are there apparent differences in either `spnbmd` or `age` between these two groups?
 
 - Create a scatter plot of `spnbmd` (y axis) versus `age` (x axis), faceting by `gender`. What trends do you see in this data?
+```{r bmd-exploring}
+bmd['idnum'] <- NULL # Removing the idnum column
+bmd %>% # Summarising the data
+  group_by(gender) %>% 
+  summarise(
+    count = n(),
+    median_age = median(age)
+  )
+```
+**The number of girls and boys are 259 and 226, respectively.**
+
+```{r bmd-boxes}
+#Creating a boxplot graph on gender and age 
+box_age <- ggplot(bmd, aes(x = gender, y = age)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y= "Age", x = "Gender")
+#Creating a boxplot graph on gender and age 
+box_spnbmd <- ggplot(bmd, aes(x = gender, y = spnbmd)) +
+  geom_boxplot() +
+  theme_bw() +
+  labs(y= "Age", x = "Gender")
+plot_grid(box_age, box_spnbmd) # Putting both plots together
+```
+```{r bmd-scatter}
+# Creating a scatter plot based on age and spinal bone density
+ggplot(bmd, aes(x=age, y=spnbmd)) +
+  geom_point() + 
+  facet_wrap(.~gender)
+```
 
 ## Model (15 points)
 
@@ -123,6 +159,9 @@ To ensure unbiased assessment of predictive models, let's split the data before 
 
 ```{r}
 set.seed(5) # seed set for reproducibility (DO NOT CHANGE)
+picked <- sample(seq_len(nrow(bmd)),size = 485*.8)
+bmd_train <- bmd[picked,] # Creating a train tibble
+bmd_test <- bmd[-picked,] # Creating a test tibble
 ```
 
 ### Tune
@@ -137,21 +176,98 @@ set.seed(5) # seed set for reproducibility (DO NOT CHANGE)
 
 - Given our intuition for what growth curves look like, which of these two values of the degrees of freedom makes more sense?
 
+```{r gender-split}
+# Splitting everything into male and female 
+bmd_train_male <- bmd_train %>% filter(gender == "male")
+bmd_train_female <- bmd_train %>% filter(gender == "female")
+bmd_test_male <- bmd_test %>% filter(gender == "male")
+bmd_test_female <- bmd_test %>% filter(gender == "female")
+
+# Using the function to find the best splines for male and females
+male_fit <- cross_validate_spline(bmd_train_male$age, 
+                             bmd_train_male$spnbmd, 10, 1:15)
+female_fit <- cross_validate_spline(bmd_train_female$age, 
+                             bmd_train_female$spnbmd, 10, 1:15)
+plot_grid(male_fit$cv_plot, female_fit$cv_plot)
+
+```
+**The degrees of freedom minimizing the CV error are 4 and 5 for boys and girls, respectively. The values obtained from the one standard error rule, however, are 3 and 3 for both boys and girls.**
+
+```{r bmd-scatter-spline}
+# Creating a scatter plot based on age and spinal bone density
+ggplot(bmd, aes(x=age, y=spnbmd)) +
+  geom_point() + 
+  geom_smooth(method = "lm",
+  formula = "y ~ splines::ns(x, df = 5)",
+  se = FALSE, color = "red") +
+  geom_smooth(method = "lm",
+  formula = "y ~ splines::ns(x, df = 3)",
+  se = FALSE) +
+  facet_wrap(.~gender)
+```
+**The fit with five degrees of freedom appears to be the best. With 3, there is an uptick for women once they reach 20 years old, which seems strange given that most people should have stopped growing at that point.**
+
 ### Final fit
 
 - Using the degrees of freedom chosen above, fit final spline models to `bmd_train_male` and `bmd_train_female`. 
+
+```{r bmd-fitting}
+# Fit the splines for both men and women
+spline_fit_male = lm(spnbmd ~ splines::ns(age, df = 3), data = bmd_train_male)
+spline_fit_female = lm(spnbmd ~ splines::ns(age, df = 3), data = bmd_train_female)
+```
 
 ## Evaluate (6 points)
 
 - Using the final models above, answer the following questions for boys and girls separately: What percent of the variation in `spnbmd` is explained by the spline fit in the training data? What is the training RMSE? What is the test RMSE? Print these three metrics in a nice table.
 
 - How do the training and test errors compare? What does this suggest about the extent of overfitting that has occurred?
+```{r}
+library(Metrics) # Using a package for this
+summary(spline_fit_male)
+# Predicting the values for the train error for men
+y_hat_train_male <- predict(spline_fit_male, newdata = bmd_train_male)
+# Getting the error using the library
+train_rmse_male <- rmse(bmd_train_male$spnbmd, y_hat_train_male)
+# Predicting the values for the test error 
+y_hat_test_male <- predict(spline_fit_male, newdata = bmd_test_male)
+# Getting the error using the library
+test_rmse_male <- rmse(bmd_test_male$spnbmd, y_hat_test_male)
+
+summary(spline_fit_female)
+# Predicting the values for the train error for women
+y_hat_train_female <- predict(spline_fit_female, newdata = bmd_train_female)
+# Getting the error using a formula
+train_rmse_female <- rmse(bmd_train_female$spnbmd, y_hat_train_female)
+# Predicting the values of the test error 
+y_hat_test_female <- predict(spline_fit_female, newdata = bmd_test_female)
+# Getting the error using the library
+test_rmse_female <- rmse(bmd_test_female$spnbmd, y_hat_test_female)
+
+tribble(
+  ~gender, ~r_squared, ~train_rmse, ~test_rmse,
+  #-----|------------|-----------|----------|
+  "male", summary(spline_fit_male)$r.squared, train_rmse_male, test_rmse_male,
+  "female", summary(spline_fit_female)$r.squared, train_rmse_female, test_rmse_female
+)
+
+```
+**The test and training errors are quite close together. This suggets that there is very little overfitting.**
 
 ## Interpret (7 points)
 
 - Using the degrees of freedom chosen above, redo the scatter plot with the overlaid spline fits, this time without faceting in order to directly compare the spline fits for boys and girls. Instead of faceting, distinguish the genders by color.
 
 - The splines help us see the trend in the data much more clearly. Eyeballing these fitted curves, answer the following questions. At what ages (approximately) do boys and girls reach the peaks of their growth spurts? At what ages does growth largely level off for boys and girls? Do these seem in the right ballpark?
+
+```{r bmd-interpret}
+ggplot(bmd, aes(x=age, y=spnbmd, color = gender)) +
+  geom_point() + 
+  geom_smooth(method = "lm",
+  formula = "y ~ splines::ns(x, df = 5)", se = FALSE) +
+  theme_bw()
+```
+**For women, the peak of the growth curve is around 12, and their growth curve levels off at around 17. For men, the peak is around 14, while their curve levels off at around 20. This makes sense as it's around when people enter and exit puberty. I also remember from high school biology that women tend to enter puberty earlier than men, so the fact that the female curve peaks earlier than the male one also makes sense.**
 
 # KNN and bias-variance tradeoff (45 points for correctness; 5 points for presentation)
 
