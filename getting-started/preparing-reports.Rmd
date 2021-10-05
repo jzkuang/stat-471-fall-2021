@@ -41,7 +41,7 @@ test_data = tibble(x = rnorm(10), y = rnorm(10))
 test_data %>% ggplot(aes(x = x, y = y)) + geom_point() + theme_bw()
 ```
 
-Each figure should have a caption and should be referenced in the text. You can add a caption by including `fig.cap` in the chunk header, and you can reference the figure by including a chunk name (in this case `test-plot`). 
+Each figure should have a caption and should be referenced in the text. You can add a caption by including `fig.cap` in the chunk header, and you can reference the figure by including a chunk name (in this case `test-plot`). Note that having a caption is necessary to be able to reference a figure!
 ````markdown
 `r ''````{r test-plot, fig.cap = "This is a test plot.", fig.align = "center"}
 test_data %>% ggplot(aes(x = x, y = y)) + geom_point() + theme_bw()
@@ -87,7 +87,7 @@ test_data %>%
   kable_styling(position = "center")
 ```
 ````
-This produces Table \@ref(tab:test-table). This type of table reference can be obtained by typing `Figure \@ref(tab:test-table)`. Note that captions for tables must go into the `kable` function rather than into the chunk header like for figures. The chunk name is still used to reference the table.
+This produces Table \@ref(tab:test-table). This type of table reference can be obtained by typing `Table \@ref(tab:test-table)`. Note that captions for tables must go into the `kable` function rather than into the chunk header like for figures. The chunk name is still used to reference the table. Note that having a caption is necessary to be able to reference a table!
 
 # High-quality reports
 
@@ -286,3 +286,32 @@ plot_grid(p1, p2,
 ## Tables
 
 Tables are generally less complex than figures, but many of the principles of creating high-quality figures carry over to tables as well (e.g. choosing appropriate sizes, captions, and titles.)
+
+### Column titles for tables
+
+Just like axis labels for figures, column titles for tables should be easily readable. Often this means not using the variable names directly from your data frame. For example, consider Table \@ref(tab:table-unclear), which tabulates the number of cylinders and the drive train type for the cars in `mpg`. 
+```{r table-unclear}
+# a table without clear column titles
+mpg %>% 
+  count(cyl, drv) %>%
+  kable(format = "latex", row.names = NA, 
+      booktabs = TRUE, digits = 2, 
+      caption = "A table without clear column titles") %>%
+  kable_styling(position = "center")
+```
+We can specify clear column names via the `col.names` argument to `kable`. See Table \@ref(tab:table-clear) and the code chunk that produced it.
+```{r table-clear}
+# a table with clear column titles
+mpg %>% 
+  count(cyl, drv) %>%
+  kable(format = "latex", 
+        row.names = NA, 
+        col.names = c("Num. cylinders", "Drive train", "Count"),
+        booktabs = TRUE, 
+        digits = 2, 
+        caption = "(A table with clear column titles.) Cross-tabulation of the 
+        number of cylinders and the drive train type for the cars in mpg.") %>%
+  kable_styling(position = "center")
+```
+
+
