@@ -115,7 +115,7 @@ train_data %>%
   geom_point() + 
   stat_function(fun = f, aes(colour = "Truth"), size = 1) + 
   geom_smooth(method = "lm", 
-              formula = "y ~ splines::ns(x, df = 2)",
+              formula = "y ~ splines::ns(x, df = 9)",
               aes(colour = "Fit"), se = FALSE) + 
   scale_colour_manual(values = c("red", "blue")) +
   theme_bw() + theme(legend.title = element_blank())
@@ -237,7 +237,8 @@ bias_variance
 ```
 Based on this information, how do we compute expected test error?
 ```{r, eval = F}
-bias_variance %>% mutate(expected_test_error = ???)
+bias_variance %>% mutate(expected_test_error = 
+                           sq_bias + variance + irreducible_error)
 ```
 
 ## Sanity check 1: does the variance match the formula?
