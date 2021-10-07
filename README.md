@@ -36,15 +36,15 @@ Thu 9/23 | 2. Tuning predictive models | Cross-validation | ISLR Ch. 5.1 | [Clas
 Tue 9/28 | 2. Tuning predictive models | Classification | ISLRv1 pp. 127-130 / ISLRv2 pp. 129-132 | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=38c8f6f1-9bef-4782-be69-adb00166fd48); [Slides (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-2/unit-2-lecture-4-slides.pdf); [Programming material (.rmd)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-2/unit-2-lecture-4-programming.Rmd); [Programming material (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-2/unit-2-lecture-4-programming.pdf) | --
 Thu 9/30 | 2. Tuning predictive models | Unit 2 Review | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=cf28be44-bf1e-452c-809d-adb300c72e02); [Slides (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-2/unit-2-review.pdf) | [Quiz 2](https://canvas.upenn.edu/courses/1597404/assignments/9195850) in class;<br /> ([Quiz 2 from last semester](https://canvas.upenn.edu/courses/1597404/quizzes/2651261))
 Mon 10/4 | -- | -- | -- | -- | Homework 2 due at 11:59pm
-Tue 10/5 | 3. Regression-based methods | Logistic regression | ISLR Ch. 4.3 | TBA | --
+Tue 10/5 | 3. Regression-based methods | Logistic regression | ISLR Ch. 4.3 | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=d6e0c0e7-2dae-49a4-a681-adb800db1096); [Slides (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-3/unit-3-lecture-1-slides.pdf); [Programming material (.rmd)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-3/unit-3-lecture-1-programming.Rmd); [Programming material (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-3/unit-3-lecture-1-programming.pdf) | --
 Thu 10/7 | 3. Regression-based methods | Regression in high dimensions | ISLR Ch. 6.4 | TBA | --
 Tue 10/12 | 3. Regression-based methods | Ridge regression | ISLR Ch. 6.2.1, 6.2.3 | TBA | --
 Thu 10/14 | -- | Fall break | -- | -- | --
 Tue 10/19 | 3. Regression-based methods | Lasso regression | ISLR Ch. 6.2.2 | TBA | --
 Thu 10/21 | 3. Regression-based methods | Unit 3 Review | -- | TBA | Quiz 3 in class
 Fri 10/22 | -- | Midterm review session (5:15-6:45pm in JMHH F85) | -- | TBA | --
-Sun 10/24 | -- | -- | -- | -- | Homework 3 due at 11:59pm
-Mon 10/25 | -- | -- | -- | -- | Midterm exam (7-9pm)
+Sun 10/24 | -- | -- | -- | -- | [Homework 3](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-3/homework-3.pdf) due at 11:59pm
+Mon 10/25 | -- | -- | -- | -- | Midterm exam (7-9pm);<br />([Last year's midterm and solutions](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/midterm/midterm-spring-2021))
 Tue 10/26 | -- | Midterm solutions and final project intro | -- | TBA | --
 Thu 10/28 | -- | Buffer | TBA | TBA | --
 Tue 11/2 | 4. Tree-based methods | Growing decision trees | ISLRv1 pp. 303-307, 311-314 / ISLRv2 pp. 327-331, 335-338 | TBA | --
