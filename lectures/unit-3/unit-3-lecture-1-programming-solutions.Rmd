@@ -1,0 +1,145 @@
+---
+title: 'Unit 3 Lecture 1: Logistic Regression'
+date: "October 5, 2021"
+output: pdf_document
+---
+
+```{r, message = FALSE}
+library(pROC)        # for ROC curves
+library(tidyverse)
+```
+
+In today's R demo, we will apply logistic regression to the `Default` data from lecture:
+
+```{r}
+default_data = ISLR2::Default %>% as_tibble()
+default_data
+```
+
+The rest of the activity will be easier if we code `default` as 0-1:
+```{r}
+default_data = default_data %>% mutate(default = as.numeric(default == "Yes"))
+default_data
+```
+
+As an exploratory question, what is the default rate in this data?
+
+```{r}
+default_data %>%
+  summarise(mean(default))
+```
+**The default rate is about 3%.**
+
+Let's split the default data into training and test sets:
+```{r}
+set.seed(471)
+train_samples = sample(1:nrow(default_data), 0.8*nrow(default_data))
+default_train = default_data %>% filter(row_number() %in% train_samples)
+default_test = default_data %>% filter(!(row_number() %in% train_samples))
+```
+
+# Running a logistic regression
+
+The way to run a logistic regression is through the `glm` function:
+```{r}
+glm_fit = glm(default ~ student + balance + income, 
+              family = "binomial",
+              data = default_train)
+coef(glm_fit)
+```
+
+- What is the coefficient estimate for `student`? 
+- Does this suggest that being a student increases or decreases the probability of default, other things being equal?
+- According to this estimate, how does being a student impact the log-odds of default? How does it impact the odds of default?
+
+**The coefficient estimate is about -0.7. This suggests that being a student decreases the probability of default. Being a student decreases the log-odds of default by 0.7, so it multiplies the odds of default by exp(-0.7), which is about 0.5. In other words, being a student halves the odds of default.**
+
+# Fitted probabilities and making predictions
+We can extract the fitted probabilities of default for a test set using the `predict` function:
+```{r}
+fitted_probabilities = predict(glm_fit, 
+        newdata = default_test,
+        type = "response")                # to get output on probability scale
+head(fitted_probabilities)
+hist(fitted_probabilities)
+```
+
+We can now make predictions based on the fitted probabilities using the standard 0.5 threshold:
+```{r}
+predictions = as.numeric(fitted_probabilities > 0.5)
+head(predictions)
+```
+
+# Evaluating the classifier
+
+Let's calculate the misclassification rate of the above logistic regression classifier. 
+```{r}
+# first add predictions to the tibble
+default_test = default_test %>% 
+  mutate(predicted_default = predictions)
+default_test
+
+# then calculate misclassification rate
+default_test %>% 
+  summarise(mean(default != predicted_default))
+```
+To get a fuller picture, let's calculate the confusion matrix:
+```{r}
+default_test %>% 
+  select(default, predicted_default) %>%
+  table()
+```
+
+- What are the false positive and false negative rates of this classifier? 
+
+**The false positive rate is 11/(11+1931) = 0.006 and the false negative rate is 47/(47+11) = 0.81.**
+
+- If the cost of a false negative is three times that of a false positive, what probability threshold should we use? What are the  false positive and false negative rates for the resulting classifier?
+
+```{r}
+thresh = 1/(1+3)
+predictions = as.numeric(fitted_probabilities > thresh)
+default_test %>% 
+  mutate(predicted_default = predictions) %>%
+  select(default, predicted_default) %>%
+  table()
+```
+**We should use a threshold of 1/(1+3) = 1/4. The resulting false positive rate is about 2% and the resulting false negative rate is about 52%.**
+
+Next, let's plot the ROC curve for this classifier. 
+
+```{r}
+# ROC curve
+roc_data = roc(default_test %>% pull(default), 
+               fitted_probabilities) 
+
+tibble(FPR = 1-roc_data$specificities,
+       TPR = roc_data$sensitivities) %>%
+  ggplot(aes(x = FPR, y = TPR)) + 
+  geom_line() + 
+  geom_abline(slope = 1, linetype = "dashed") +
+#  geom_point(x = fpr, y = 1-fnr, colour = "red") +
+  theme_bw()
+
+# print the AUC
+roc_data$auc
+```
+
+
+# Plotting a univariate logistic regression fit
+
+Univariate logistic regression fits can be plotted using `geom_smooth`:
+```{r}
+default_train %>% 
+  ggplot(aes(x = balance, y = default))+
+  geom_jitter(height = .05) +
+  geom_smooth(method = "glm",
+              formula = "y~x",
+              method.args = list(family = "binomial"),
+              se = FALSE) +
+  ylab("Prob(default=1)") + 
+  theme_bw()
+```
+Roughly at what value of balance do we switch from predicting no default to predicting default? 
+
+**We switch from predicting no default to predicting default around balance = 2000.**
