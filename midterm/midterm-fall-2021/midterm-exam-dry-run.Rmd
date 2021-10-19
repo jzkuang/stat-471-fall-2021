@@ -1,0 +1,124 @@
+---
+title: 'STAT 471: Midterm Exam Dry Run'
+output:
+  bookdown::pdf_document2:
+    number_sections: yes
+    toc: no
+    toc_depth: '3'
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+options(scipen = 0, digits = 3)  # controls number of significant digits printed
+```
+
+Please make sure you can successfully compile this document to PDF well in advance of the midterm exam. If not, please consult the teaching staff for help as soon as possible.
+
+# Test load packages
+
+```{r, message = FALSE}
+library(kableExtra)                     # for printing tables
+library(cowplot)                        # for side by side plots
+library(glmnetUtils)                    # to run ridge and lasso
+library(lubridate)                      # for dealing with dates
+library(maps)                           # for creating maps
+source("../../functions/plot_glmnet.R") # for lasso/ridge trace plots
+library(tidyverse)                      # for everything else
+```
+
+# Test `glmnetUtils`
+
+```{r, message = FALSE}
+crime_data = read_csv("../../data/CrimeData_FL.csv")
+lasso_fit = cv.glmnet(violentcrimes.perpop ~ .,  # formula notation, as usual
+                      alpha = 1,                 # alpha = 1 for lasso
+                      nfolds = 10,               # number of folds
+                      data = crime_data)         # data to run lasso on
+```
+
+# Test `plot_glmnet`
+
+```{r}
+plot_glmnet(lasso_fit, crime_data, features_to_plot = 6)
+```
+
+# Test `maps`
+Figure \@ref(fig:FL-map) displays a map of Florida.
+```{r FL-map, fig.width = 5, fig.height = 3, out.width = "80%", fig.cap = "This is ia map of Florida.", fig.align='center'}
+# create a map of Florida
+map_data("county") %>%
+  as_tibble() %>% 
+  filter(region == "florida") %>%
+  ggplot() + 
+  geom_polygon(data=map_data("state") %>% filter(region == "florida"), 
+               aes(x=long, y=lat, group=group),
+               color="black", fill=NA,  size = 1, alpha = .3) + 
+  geom_polygon(aes(x=long, y=lat, group=group),
+               fill = "dodgerblue",
+               color="black", size = .25) +
+  theme_void()
+```
+
+# Test `kableExtra`
+
+Table \@ref(tab:simple-table) displays a simple table.
+```{r simple-table}
+tibble(x = 1:5, y = 6:10) %>%
+  kable(format = "latex", row.names = NA, 
+        booktabs = TRUE, digits = 2, 
+        col.names = c("Column 1", "Column 2"),
+        caption = "This is a simple table.") %>%
+  kable_styling(position = "center")
+```
+
+# Test `cowplot`
+
+```{r}
+# create a map of Florida
+fl_map = map_data("county") %>%
+  as_tibble() %>% 
+  filter(region == "florida") %>%
+  ggplot() + 
+  geom_polygon(data=map_data("state") %>% filter(region == "florida"), 
+               aes(x=long, y=lat, group=group),
+               color="black", fill=NA,  size = 1, alpha = .3) + 
+  geom_polygon(aes(x=long, y=lat, group=group),
+               fill = "dodgerblue",
+               color="black", size = .25) +
+  ggtitle("Florida") +
+  theme_void()
+
+# create a map of Georgia
+ga_map = map_data("county") %>%
+  as_tibble() %>% 
+  filter(region == "georgia") %>%
+  ggplot() + 
+  geom_polygon(data=map_data("state") %>% filter(region == "georgia"), 
+               aes(x=long, y=lat, group=group),
+               color="black", fill=NA,  size = 1, alpha = .3) + 
+  geom_polygon(aes(x=long, y=lat, group=group),
+               fill = "dodgerblue",
+               color="black", size = .25) +
+  ggtitle("Georgia") +
+  theme_void()
+
+# concatenate plots
+plot_grid(fl_map, ga_map)
+```
+
+# Test `lubridate`
+
+```{r}
+# extract today's date
+date = today()
+date
+
+# extract day
+day(date)
+
+# extract month
+month(date)
+
+# extract year
+year(date)
+```

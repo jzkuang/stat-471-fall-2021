@@ -8,12 +8,18 @@ output: pdf_document
 library(tidyverse)
 ```
 
-In this R demo, we will learn about the `glmnet` package and how to run a cross-validated ridge regression using the `cv.glmnet()` function. 
+**NOTE: This R demo has been updated since it was presented in class on October 12. Through the use of the `glmnetUtils` package, it is no longer necessary to separately construct `X` and `Y` to pass into `cv.glmnet`, or to scale the `X` matrix manually, or to remove the intercept manually. You can use `cv.glmnet` in much the same way you have been using `lm` and `glm`: by specifying a formula and supplying a data frame.**
 
-First, let's install and load the `glmnet` package.
+In this R demo, we will learn about the `glmnet` and `glmnetUtils` packages and how to run a cross-validated ridge regression using the `cv.glmnet()` function. 
+
+First, let's install the `glmnet` and `glmnetUtils` packages:
 ```{r}
 # install.packages("glmnet")
-library(glmnet)
+# install.packages("glmnetUtils")
+```
+Next, we load the `glmnetUtils` package:
+```{r}
+library(glmnetUtils)
 ```
 
 Let's also source a function called `plot_glmnet` to help us plot our results:
@@ -21,43 +27,28 @@ Let's also source a function called `plot_glmnet` to help us plot our results:
 source("../../functions/plot_glmnet.R")
 ```
 
-We will be applying ridge regression to study the effect of 97 socioeconomic factors on violent crimes per capita based on data from
-90 communities in Florida:
-```{r}
+We will be applying ridge regression to study the effect of 97 socioeconomic factors on violent crimes per capita based on data from 90 communities in Florida:
+```{r, message = FALSE}
 crime_data = read_csv("../../data/CrimeData_FL.csv")
 crime_data
 ```
 
-# Standardizing the features and train/test split
-
-The syntax of `glmnet()` is slightly different from that of `lm()` and `glm()`. Instead of specifying a formula, it takes arguments `x` and `y` representing the matrix of features and the vector of responses. To create these, we use the following syntax:
-```{r}
-X = model.matrix(violentcrimes.perpop ~ ., data = crime_data)[,-1]
-Y = crime_data %>% pull(violentcrimes.perpop)
-```
-We remove the intercept term via `[,-1]` because it will be added in automatically by `glmnet`.
-
-Then we standardize the matrix `X`, as discussed in the slides:
-```{r}
-X_ctr = apply(X, 2, function(col)(col-mean(col)))
-X_std = apply(X_ctr, 2, function(col)(col/sqrt(sum(col^2)/nrow(X_ctr))))
-```
-
-Finally, let's split the (standardized) data into training and testing, as usual:
+Let's split the data into training and testing, as usual:
 ```{r}
 set.seed(471)
 train_samples = sample(1:nrow(crime_data), 0.8*nrow(crime_data))
-X_std_train = X_std[train_samples,]
-X_std_test = X_std[-train_samples,]
-Y_train = Y[train_samples]
-Y_test = Y[-train_samples]
+crime_data_train = crime_data %>% filter(row_number() %in% train_samples)
+crime_data_test = crime_data %>% filter(!(row_number() %in% train_samples))
 ```
 
 # Running a cross-validated ridge regression
 
-Finally, we call `cv.glmnet` on `X_std_train` and `Y_train`.
+We call `cv.glmnet` on `crime_data_train`:
 ```{r}
-ridge_fit = cv.glmnet(x = X_std_train, y = Y_train, alpha = 0, nfolds = 10) 
+ridge_fit = cv.glmnet(violentcrimes.perpop ~ .,  # formula notation, as usual
+                      alpha = 0,                 # alpha = 0 for ridge
+                      nfolds = 10,               # number of folds
+                      data = crime_data_train)   # data to run ridge on
 ```
 
 A few things to note:
@@ -65,6 +56,8 @@ A few things to note:
 - the sequence of penalty parameters is automatically chosen for you
 - `alpha = 0` means "ridge regression" (we'll discuss other values of alpha next lecture)
 - `nfolds` specifies the number of folds for cross-validation
+- the columns of the matrix `X` are being standardized for you behind the scenes;
+there is no need to standardize yourself
 
 # Inspecting the results
 
@@ -95,14 +88,16 @@ coef(ridge_fit, s = "lambda.min") %>% head()
 
 To visualize the fitted coefficients as a function of lambda, we can make a plot of the coefficients like we saw in class. To do this, we can use the `plot_glmnet` function, which by default shows a dashed line at the lambda value chosen using the one-standard-error rule:
 ```{r}
-plot_glmnet(ridge_fit)
+plot_glmnet(ridge_fit, crime_data_train) # NOTE: MUST PASS IN THE DATA AS WELL
+                                         #  AS THE FIT OBJECT
 ```
 
 If we want to annotate the features with the top few coefficients, we can use the `features_to_plot` argument:
 
 ```{r}
-plot_glmnet(ridge_fit, features_to_plot = 7)
+plot_glmnet(ridge_fit, crime_data_train, features_to_plot = 7)
 ```
+
 To interpret these coefficient estimates, recall that they are for the *standardized* features.
 
 # Making predictions
@@ -110,13 +105,13 @@ To interpret these coefficient estimates, recall that they are for the *standard
 To make predictions on the test data, we can use the `predict` function (which we've seen before):
 ```{r}
 ridge_predictions = predict(ridge_fit, 
-                            newx = X_std_test, 
+                            newdata = crime_data_test,
                             s = "lambda.1se") %>% as.numeric()
 ridge_predictions
 ```
 We can evaluate the root-mean-squared-error as before:
 ```{r}
-RMSE = sqrt(mean(ridge_predictions - Y_test)^2)
+RMSE = sqrt(mean(ridge_predictions - crime_data_test$violentcrimes.perpop)^2)
 RMSE
 ```
 
@@ -124,47 +119,40 @@ RMSE
 
 We can also run a ridge-penalized logistic regression. Let's try it out on `default_data`.
 ```{r}
+# load data, convert default to binary
 default_data = ISLR2::Default %>% 
   as_tibble() %>% 
   mutate(default = as.numeric(default == "Yes"))
-default_data
-```
-
-We generate the model matrix, then standardize, then split:
-```{r}
-# generate model matrix
-X = model.matrix(default ~ ., data = default_data)[,-1]
-Y = default_data %>% pull(default)
-
-# standardize
-X_ctr = apply(X, 2, function(col)(col-mean(col)))
-X_std = apply(X_ctr, 2, function(col)(col/sqrt(sum(col^2)/nrow(X_ctr))))
-
-# split
+# split into train and test
 set.seed(471)
 train_samples = sample(1:nrow(default_data), 0.8*nrow(default_data))
-X_std_train = X_std[train_samples,]
-X_std_test = X_std[-train_samples,]
-Y_train = Y[train_samples]
-Y_test = Y[-train_samples]
+default_train = default_data %>% filter(row_number() %in% train_samples)
+default_test = default_data %>% filter(!(row_number() %in% train_samples))
 ```
 
 To run the logistic ridge regression, we call `cv.glmnet` as before, adding the argument `family = binomial` to specify that we want to do a logistic regression and the argument `type.measure = "class`: to specify that we want to use the misclassification error during cross-validation.
 ```{r}
-ridge_fit = cv.glmnet(x = X_std_train, y = Y_train, alpha = 0, nfolds = 10,
-                      family = "binomial", type.measure = "class") 
+ridge_fit = cv.glmnet(default ~ .,             # formula notation, as usual
+                      alpha = 0,               # alpha = 0 means ridge
+                      nfolds = 10,             # number of CV folds
+                      family = "binomial",     # to specify logistic regression
+                      type.measure = "class",  # use misclassification error in CV
+                      data = default_train)    # train on default_train data
 ```
 
 We can then take a look at the CV plot and the trace plot as before:
 ```{r}
 plot(ridge_fit)
-plot_glmnet(ridge_fit, features_to_plot = 3)
+plot_glmnet(ridge_fit, default_train, features_to_plot = 4)
 ```
 
 To predict using the fitted model, we can use the `predict` function again, this time specifying `type = "response"` to get the predictions on the probability scale (as opposed to the log-odds scale).
 ```{r}
-probabilities = predict(ridge_fit, newx = X_std_test, 
-                        s = "lambda.1se", type = "response") %>% as.numeric()
+probabilities = predict(ridge_fit,               # fit object
+                        newdata = default_test,  # new data to test on
+                        s = "lambda.1se",        # which value of lambda to use
+                        type = "response") %>%   # to output probabilities
+  as.numeric()                                   # convert to vector
 head(probabilities)
 ```
 

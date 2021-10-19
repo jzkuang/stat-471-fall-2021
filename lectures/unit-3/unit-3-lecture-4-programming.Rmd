@@ -1,0 +1,199 @@
+---
+title: 'Unit 3 Lecture 4: Lasso regression'
+date: "October 19, 2021"
+output: pdf_document
+---
+
+```{r, echo = FALSE, message = FALSE}
+library(tidyverse)
+```
+
+
+In this R demo, we will learn about the `glmnet` and `glmnetUtils` packages and how to run a cross-validated lasso and elastic net regressions using the `cv.glmnet()` and `cva.glmnet()` functions, respectively. 
+
+Let's load the `glmnetUtils` package:
+```{r}
+library(glmnetUtils)
+```
+
+Let's also source a file called `plot_glmnet` with some helper functions.
+```{r}
+source("../../functions/plot_glmnet.R")
+```
+
+We will apply lasso regression to study the effect of 97 socioeconomic factors on violent crimes per capita based on data from 90 communities in Florida:
+```{r, message = FALSE}
+crime_data = read_csv("../../data/CrimeData_FL.csv")
+crime_data
+```
+
+Let's split the data into training and testing, as usual:
+```{r}
+set.seed(471)
+train_samples = sample(1:nrow(crime_data), 0.8*nrow(crime_data))
+crime_data_train = crime_data %>% filter(row_number() %in% train_samples)
+crime_data_test = crime_data %>% filter(!(row_number() %in% train_samples))
+```
+
+# Running a cross-validated lasso regression
+
+We call `cv.glmnet` on `crime_data_train`:
+```{r}
+lasso_fit = cv.glmnet(violentcrimes.perpop ~ .,  # formula notation, as usual
+                      alpha = 1,                 # alpha = 1 for lasso
+                      nfolds = 10,               # number of folds
+                      data = crime_data_train)   # data to run lasso on
+```
+
+# Inspecting the results
+
+The `glmnet` package has a very nice `plot` function to produce the CV plot:
+```{r}
+plot(lasso_fit)
+```
+
+The `lasso_fit` object has several fields with information about the fit:
+```{r}
+# lambda sequence
+head(lasso_fit$lambda)
+# number of nonzero coefficients
+head(lasso_fit$nzero)
+# CV estimates
+head(lasso_fit$cvm)
+# CV standard errors
+head(lasso_fit$cvsd)
+# lambda achieving minimum CV error
+lasso_fit$lambda.min
+# lambda based on one-standard-error rule
+lasso_fit$lambda.1se
+```
+
+To get the fitted coefficients at the selected value of lambda:
+```{r}
+coef(lasso_fit, s = "lambda.1se") %>% head()
+coef(lasso_fit, s = "lambda.min") %>% head()
+```
+Note that these coefficient vectors are sparse. We can get a list of the nonzero standardized coefficients as follows:
+```{r}
+beta_hat_std = extract_std_coefs(lasso_fit, crime_data_train)
+beta_hat_std
+beta_hat_std %>% filter(coefficient != 0)
+```
+
+To visualize the fitted coefficients as a function of lambda, we can make a plot of the coefficients like we saw in class. To do this, we can use the `plot_glmnet` function, which by default shows a dashed line at the lambda value chosen using the one-standard-error rule:
+```{r}
+plot_glmnet(lasso_fit, crime_data_train)
+```
+
+By default, `plot_glmnet` annotates the features with nonzero coefficients. To interpret these coefficient estimates, recall that they are for the *standardized* features.
+
+# Making predictions
+
+To make predictions on the test data, we can use the `predict` function (which we've seen before):
+```{r}
+lasso_predictions = predict(lasso_fit, 
+                            newdata = crime_data_test,
+                            s = "lambda.1se") %>% as.numeric()
+lasso_predictions
+```
+We can evaluate the root-mean-squared-error as before:
+```{r}
+RMSE = sqrt(mean(lasso_predictions - crime_data_test$violentcrimes.perpop)^2)
+RMSE
+```
+
+# Elastic net regression
+
+Next, let's run an elastic net regression. We can do this via the `cva.glmnet()` function:
+```{r}
+elnet_fit = cva.glmnet(violentcrimes.perpop ~ .,  # formula notation, as usual
+                       nfolds = 10,               # number of folds
+                       data = crime_data_train)   # data to run on
+```
+
+The following are the values of `alpha` that were used:
+```{r}
+elnet_fit$alpha
+```
+
+We can plot the minimum CV error for each value of alpha using the helper function `plot_cva_glmnet()` from `plot_glmnet.R`:
+```{r}
+plot_cva_glmnet(elnet_fit)
+```
+
+We can then extract the `cv.glmnet` fit object based on the optimal `alpha` using `extract_best_elnet` from `plot_glmnet.R`:
+```{r}
+elnet_fit_best = extract_best_elnet(elnet_fit)
+```
+
+The `elnet_fit_best` object is a usual `glmnet` fit object, with an additional field called `alpha` specifying which value of `alpha` was used:
+```{r}
+elnet_fit_best$alpha
+```
+
+We can make a CV plot to select `lambda` as usual:
+```{r}
+plot(elnet_fit_best)
+```
+
+And we can make a trace plot for this optimal value of `alpha`:
+```{r}
+plot_glmnet(elnet_fit_best, crime_data_train)
+```
+
+This is too many features to highlight, so let's choose a smaller number:
+```{r}
+plot_glmnet(elnet_fit_best, crime_data_train, features_to_plot = 6)
+```
+
+We can make predictions and evaluate test error using the `elnet_fit_best` object:
+```{r}
+elnet_predictions = predict(elnet_fit, 
+                            alpha = elnet_fit$alpha,
+                            newdata = crime_data_test,
+                            s = "lambda.1se") %>% as.numeric()
+elnet_predictions
+RMSE = sqrt(mean(elnet_predictions - crime_data_test$violentcrimes.perpop)^2)
+RMSE
+```
+
+# Ridge logistic regression
+
+We can also run a lasso-penalized logistic regression. Let's try it out on a binarized version of the crime data:
+```{r}
+# redefine response based on whether violentcrimes.perpop is above the median
+crime_data_binary_train = crime_data_train %>%
+  mutate(violentcrimes.perpop = 
+           as.numeric(violentcrimes.perpop > median(violentcrimes.perpop)))
+crime_data_binary_test = crime_data_test %>%
+  mutate(violentcrimes.perpop = 
+           as.numeric(violentcrimes.perpop > median(violentcrimes.perpop)))
+```
+
+To run the logistic lasso regression, we call `cv.glmnet` as before, adding the argument `family = binomial` to specify that we want to do a logistic regression and the argument `type.measure = "class`: to specify that we want to use the misclassification error during cross-validation.
+```{r}
+lasso_fit = cv.glmnet(violentcrimes.perpop ~ .,       # formula notation, as usual
+                      alpha = 1,                      # alpha = 0 means lasso
+                      nfolds = 10,                    # number of CV folds
+                      family = "binomial",            # logistic regression
+                      type.measure = "class",         # use misclassification error
+                      data = crime_data_binary_train) # train on default_train data
+```
+
+We can then take a look at the CV plot and the trace plot as before:
+```{r}
+plot(lasso_fit)
+plot_glmnet(lasso_fit, crime_data_binary_train)
+```
+
+To predict using the fitted model, we can use the `predict` function again, this time specifying `type = "response"` to get the predictions on the probability scale (as opposed to the log-odds scale).
+```{r}
+probabilities = predict(lasso_fit,                        # fit object
+                        newdata = crime_data_binary_test, # new data to test on
+                        s = "lambda.1se",                 # value of lambda to use
+                        type = "response") %>%            # output probabilities
+  as.numeric()                                            # convert to vector
+head(probabilities)
+```
+
+We can threshold the probabilities to get binary predictions as we did with regular logistic regression.
