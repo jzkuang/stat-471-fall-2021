@@ -111,7 +111,7 @@ ridge_predictions
 ```
 We can evaluate the root-mean-squared-error as before:
 ```{r}
-RMSE = sqrt(mean(ridge_predictions - crime_data_test$violentcrimes.perpop)^2)
+RMSE = sqrt(mean((ridge_predictions - crime_data_test$violentcrimes.perpop)^2))
 RMSE
 ```
 

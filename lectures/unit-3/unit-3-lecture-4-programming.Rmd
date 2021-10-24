@@ -98,7 +98,7 @@ lasso_predictions
 ```
 We can evaluate the root-mean-squared-error as before:
 ```{r}
-RMSE = sqrt(mean(lasso_predictions - crime_data_test$violentcrimes.perpop)^2)
+RMSE = sqrt(mean((lasso_predictions - crime_data_test$violentcrimes.perpop)^2))
 RMSE
 ```
 
@@ -153,7 +153,7 @@ elnet_predictions = predict(elnet_fit,
                             newdata = crime_data_test,
                             s = "lambda.1se") %>% as.numeric()
 elnet_predictions
-RMSE = sqrt(mean(elnet_predictions - crime_data_test$violentcrimes.perpop)^2)
+RMSE = sqrt(mean((elnet_predictions - crime_data_test$violentcrimes.perpop)^2))
 RMSE
 ```
 
