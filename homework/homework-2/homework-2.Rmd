@@ -16,7 +16,6 @@ output:
     toc_float: yes
 urlcolor: blue
 ---
-
 ```{r setup, include=FALSE}
 options(scipen = 0, digits = 3)  # controls number of significant digits printed
 ```
@@ -39,7 +38,11 @@ In accordance with this policy,
 
 *Please list anyone you discussed this homework with:* 
 
+Alex Chen
+
 *Please list what external references you consulted (e.g. articles, books, or websites):*
+
+Stack Overflow, R Documentation 
 
 ## Writeup {-}
 
@@ -118,34 +121,41 @@ bmd
 - Create a scatter plot of `spnbmd` (y axis) versus `age` (x axis), faceting by `gender`. What trends do you see in this data?
 ```{r bmd-exploring}
 bmd['idnum'] <- NULL # Removing the idnum column
-bmd %>% # Summarising the data
+summarized_bmd <- bmd %>% # Summarizing the data
   group_by(gender) %>% 
   summarise(
-    count = n(),
-    median_age = median(age)
+    count = n(), # Counting rows
+    median_age = median(age) # Finding Median
   )
 ```
-**The number of girls and boys are 259 and 226, respectively.**
+**The number of girls and boys are 259 and 226, respectively. The median age is 15.3 and 15.6 for girls and boys, respectively.**
 
-```{r bmd-boxes}
+```{r bmd-boxes, fig.width = 6, fig.height= 3.5, out.width= "70%", fig.align= 'center', fig.cap="Boxplots for Age and Relative Spinal Bone Mineral Density by Gender"}
 #Creating a boxplot graph on gender and age 
 box_age <- ggplot(bmd, aes(x = gender, y = age)) +
-  geom_boxplot() +
-  theme_bw() +
+  geom_boxplot() + # Creating the plot
+  theme_bw() + # Formatting Changes
+  scale_x_discrete(labels = c("Female", "Male")) +
   labs(y= "Age", x = "Gender")
 #Creating a boxplot graph on gender and age 
 box_spnbmd <- ggplot(bmd, aes(x = gender, y = spnbmd)) +
-  geom_boxplot() +
-  theme_bw() +
-  labs(y= "Age", x = "Gender")
+  geom_boxplot() + # Creating the plot
+  theme_bw() + # Formatting fixes
+  scale_x_discrete(labels = c("Female", "Male")) +
+  labs(y= "Relative Spinal Bone Mineral Density", x = "Gender")
 plot_grid(box_age, box_spnbmd) # Putting both plots together
 ```
-```{r bmd-scatter}
+**There are a few differences between the two genders. In Figure \@ref(fig:bmd-boxes), the median for age and relative spinal bone mineral density appear a bit lower for females than men. The distribution of female relative spinal bone mineral density also appears a bit higher than male's.**
+
+```{r bmd-scatter, fig.width = 6, fig.height= 3.5, out.width= "70%", fig.align= 'center', fig.cap="Relative Spinal Bone Mineral Density by Age for Men and Women"}
 # Creating a scatter plot based on age and spinal bone density
 ggplot(bmd, aes(x=age, y=spnbmd)) +
   geom_point() + 
+  labs(x = "Age", y = "Relative Spinal Bone Mineral Density") +
+  theme_bw() +
   facet_wrap(.~gender)
 ```
+**In Figure \@ref(fig:bmd-scatter), for both genders, it appears that relative spinal bone mineral density decreased as the subjects got older. This may be bone density growth leveling off upon reaching some number.**
 
 ## Model (15 points)
 
@@ -164,9 +174,8 @@ train_samples = sample(1:n, round(0.8*n))
 ```
 
 ```{r splitting}
-picked <- sample(seq_len(nrow(bmd)),size = 485*.8)
-bmd_train <- bmd[picked,] # Creating a train tibble
-bmd_test <- bmd[-picked,] # Creating a test tibble
+bmd_train <- bmd[train_samples,] # Creating a train tibble
+bmd_test <- bmd[-train_samples,] # Creating a test tibble
 ```
 
 ### Tune
@@ -181,7 +190,7 @@ bmd_test <- bmd[-picked,] # Creating a test tibble
 
 - Given our intuition for what growth curves look like, which of these two values of the degrees of freedom makes more sense?
 
-```{r gender-split}
+```{r gender-split-cv, warning = FALSE, message = FALSE, fig.width = 8, fig.height= 4.2, out.width= "75%", fig.align= 'center', fig.cap="CV Error for Different Degrees of Feedom by Gender"}
 # Splitting everything into male and female 
 bmd_train_male <- bmd_train %>% filter(gender == "male")
 bmd_train_female <- bmd_train %>% filter(gender == "female")
@@ -193,24 +202,32 @@ male_fit <- cross_validate_spline(bmd_train_male$age,
                              bmd_train_male$spnbmd, 10, 1:15)
 female_fit <- cross_validate_spline(bmd_train_female$age, 
                              bmd_train_female$spnbmd, 10, 1:15)
-plot_grid(male_fit$cv_plot, female_fit$cv_plot)
-
+# Making the plots better
+male_plot <- male_fit$cv_plot +
+  labs(x = "Degrees of Freedom (Male Fit)")
+female_plot <- female_fit$cv_plot  +
+  labs(x = "Degrees of Freedom (Female Fit)")
+#Actually plotting the graphs
+plot_grid(male_plot, female_plot)
 ```
-**The degrees of freedom minimizing the CV error are 4 and 5 for boys and girls, respectively. The values obtained from the one standard error rule, however, are 3 and 3 for both boys and girls.**
+**From Figure \@ref(fig:gender-split-cv), it is possible to see that the degrees of freedom minimizing the CV error are `r toString(male_fit$df.min)` and `r toString(female_fit$df.min)` for boys and girls, respectively. The values obtained from the one standard error rule, however, are `r toString(male_fit$df.1se)` for both boys and girls.**
 
-```{r bmd-scatter-spline}
+```{r bmd-scatter-spline, fig.width = 9, fig.height= 4.2, out.width= "75%", fig.align= 'center', fig.cap="The Splines Fitted to the Data by Gender", fig.pos = "H"}
 # Creating a scatter plot based on age and spinal bone density
 ggplot(bmd, aes(x=age, y=spnbmd)) +
-  geom_point() + 
-  geom_smooth(method = "lm",
+  geom_point() + # The scatter plot
+  geom_smooth(method = "lm", # Plotting the df=5 fit as a red line
   formula = "y ~ splines::ns(x, df = 5)",
-  se = FALSE, color = "red") +
-  geom_smooth(method = "lm",
+  se = FALSE, aes(color = "5")) +
+  geom_smooth(method = "lm", # Plotting the df=3 fit as a blue line
   formula = "y ~ splines::ns(x, df = 3)",
-  se = FALSE) +
-  facet_wrap(.~gender)
+  se = FALSE, aes(color = "3")) +
+  facet_wrap(.~gender) + # Facetting by gender
+  labs(x = "Age", y = "Relative Spinal Bone Mineral Density") +
+  theme_bw() +
+  scale_colour_manual(name="Degrees of Freedom", values=c("blue", "red"))
 ```
-**The fit with five degrees of freedom appears to be the best. With 3, there is an uptick for women once they reach 20 years old, which seems strange given that most people should have stopped growing at that point.**
+**In Figure \@ref(fig:bmd-scatter-spline), the fit with 5 degrees of freedom appears to be the best. Both splines do roughly match our intuition. People should be growing through puberty, and stop once they reach their twenties. However, with 3, there is an uptick for women once they reach past 20 years old. That seems strange given that most people should have stopped growing at that point, so 5 degrees of freedom fits better with my intuition. **
 
 ### Final fit
 
@@ -218,8 +235,8 @@ ggplot(bmd, aes(x=age, y=spnbmd)) +
 
 ```{r bmd-fitting}
 # Fit the splines for both men and women
-spline_fit_male = lm(spnbmd ~ splines::ns(age, df = 3), data = bmd_train_male)
-spline_fit_female = lm(spnbmd ~ splines::ns(age, df = 3), data = bmd_train_female)
+spline_fit_male = lm(spnbmd ~ splines::ns(age, df = 5), data = bmd_train_male)
+spline_fit_female = lm(spnbmd ~ splines::ns(age, df = 5), data = bmd_train_female)
 ```
 
 ## Evaluate (6 points)
@@ -227,9 +244,8 @@ spline_fit_female = lm(spnbmd ~ splines::ns(age, df = 3), data = bmd_train_femal
 - Using the final models above, answer the following questions for boys and girls separately: What percent of the variation in `spnbmd` is explained by the spline fit in the training data? What is the training RMSE? What is the test RMSE? Print these three metrics in a nice table.
 
 - How do the training and test errors compare? What does this suggest about the extent of overfitting that has occurred?
-```{r}
+```{r bmd-evaluate, message =FALSE, warning = FALSE}
 library(Metrics) # Using a package for this
-summary(spline_fit_male)
 # Predicting the values for the train error for men
 y_hat_train_male <- predict(spline_fit_male, newdata = bmd_train_male)
 # Getting the error using the library
@@ -239,7 +255,6 @@ y_hat_test_male <- predict(spline_fit_male, newdata = bmd_test_male)
 # Getting the error using the library
 test_rmse_male <- rmse(bmd_test_male$spnbmd, y_hat_test_male)
 
-summary(spline_fit_female)
 # Predicting the values for the train error for women
 y_hat_train_female <- predict(spline_fit_female, newdata = bmd_train_female)
 # Getting the error using a formula
@@ -249,15 +264,22 @@ y_hat_test_female <- predict(spline_fit_female, newdata = bmd_test_female)
 # Getting the error using the library
 test_rmse_female <- rmse(bmd_test_female$spnbmd, y_hat_test_female)
 
+# Printing the test metrics in a table
 tribble(
-  ~gender, ~r_squared, ~train_rmse, ~test_rmse,
-  #-----|------------|-----------|----------|
-  "male", summary(spline_fit_male)$r.squared, train_rmse_male, test_rmse_male,
-  "female", summary(spline_fit_female)$r.squared, train_rmse_female, test_rmse_female
-)
+  ~Statistic, ~Male, ~Female,
+  #---------|------|---------
+  "% of Variation Explained", summary(spline_fit_male)$r.squared, 
+              summary(spline_fit_female)$r.squared, 
+  "Training RMSE", train_rmse_male, train_rmse_female,
+  "Testing RMSE", test_rmse_male, test_rmse_female
+) %>% 
+  kable(format = "latex", row.names = NA,
+         booktabs = TRUE, digits = 2,
+         caption = "Metrics for the Final Fit on Test Data") %>% 
+  kable_styling(position = "center", latex_options = "HOLD_position")
 
 ```
-**The test and training errors are quite close together. This suggets that there is very little overfitting.**
+**In Table \@ref(tab:bmd-evaluate), the test and training errors are quite close together for both male and female fits. This suggets that there is very little overfitting.**
 
 ## Interpret (7 points)
 
@@ -265,14 +287,16 @@ tribble(
 
 - The splines help us see the trend in the data much more clearly. Eyeballing these fitted curves, answer the following questions. At what ages (approximately) do boys and girls reach the peaks of their growth spurts? At what ages does growth largely level off for boys and girls? Do these seem in the right ballpark?
 
-```{r bmd-interpret}
+```{r bmd-interpret, fig.width = 5, fig.height= 3.8, out.width= "60%", fig.align= 'center', fig.cap="Plotted Data with Splines by Gender", fig.pos="H"}
+# Plotting the data with the final spline
 ggplot(bmd, aes(x=age, y=spnbmd, color = gender)) +
   geom_point() + 
   geom_smooth(method = "lm",
   formula = "y ~ splines::ns(x, df = 5)", se = FALSE) +
-  theme_bw()
+  theme_bw() +
+  labs(x = "Age", y= "Relative Spinal Bone Mineral Density", color = "Gender")
 ```
-**For women, the peak of the growth curve is around 12, and their growth curve levels off at around 17. For men, the peak is around 14, while their curve levels off at around 20. This makes sense as it's around when people enter and exit puberty. I also remember from high school biology that women tend to enter puberty earlier than men, so the fact that the female curve peaks earlier than the male one also makes sense.**
+**In Figure \@ref(fig:bmd-interpret), the peak of the growth curve is around 12 for wowemn, and their growth curve levels off at around 17. The peak is around 14 for men, while their curve levels off at around 20. This makes sense as it's around when people enter and exit puberty. I also remember from high school biology that women tend to enter puberty earlier than men, so the fact that the female curve peaks earlier than the male one also makes sense.**
 
 # KNN and bias-variance tradeoff (45 points for correctness; 5 points for presentation)
 
@@ -331,6 +355,8 @@ This apple season is right around the corner, and you'd like to predict the yiel
 
 - Why is this not the best possible prediction rule? 
 
+**The ETE of such a rule would be 0. The squared bias would be 0. The variance would be 16 The ETE then would be 32. This isn't the best possible prediction rule as you are overfitting on the data. You are only guessing by 1 tree, which is subject to a large variance.**
+
 ## K-nearest neighbors regression (conceptual) (15 points)
 
 As a second attempt to predict a yield for each tree, you average together last year's yields of the $K$ trees closest to it (including itself, and breaking ties randomly if necessary). So if you choose $K$ = 1, you get back the simple rule from the previous section. This more general rule is called *K-nearest neighbors (KNN) regression* (see ISLR p. 105). 
@@ -344,6 +370,8 @@ KNN is not a parametric model like linear or logistic regression, so it is a lit
 - Conceptually, why might increasing $K$ tend to improve the prediction rule? What does this have to do with the bias-variance tradeoff?
 
 - Conceptually, why might increasing $K$ tend to worsen the prediction rule? What does this have to do with the bias-variance tradeoff?
+
+**The model complexity decreases as K increases. If degrees of freedom are how many parameters you are fitting into a model, then you could consider all groups of k close together points to each be a single paramater. Thus, the degrees of freedom is N/k. Increasing K could improve the prediction rule by reducing the amount of overfitting that is being done. This means decreasing variance at the cost of some bias (i.e. trading off variance for some bias). Increasing K could also worsen the prediction rule by leading to underfitting. This would still be trading off variance for some bias, but, in this case, addition of bias would be the more important factor.**
 
 ## K-nearest neighbors regression (simulation) (15 points)
 
@@ -435,3 +463,23 @@ overall_results %>%
 - The data frame `training_results_summary` contains the bias and variance for every tree in the orchard, for every value of `K`. Which tree and which value of `K` gives the overall highest absolute bias? Does the sign of the bias make sense? Why do this particular tree and this particular value of `K` give us the largest absolute bias? 
 
 - Redo the bias-variance plot above, this time putting `df = n/K` on the x-axis. What do we notice about the variance as a function of `df`? Derive a formula for the KNN variance and superimpose this formula onto the plot as a dashed curve. Do these two variance curves match? [Hint: To derive the KNN variance, focus first on the prediction of a single tree. Recall the facts that the variance of the sum of independent random variables is the sum of their variances, and that the variance of a constant multiple of a random variable is the square of that constant times its variance.]
+
+**Base on the Figure \@ref(fig:knn-bias-variance), the optimal value seems to be k=10. Normally, the plot has the degrees of freedom on the x-axis. However, as K increases the degrees of freedom actually decreases, so the x-axis is reversed. Further, there is a little bump in figure \@ref(fig:knn-bias-variance), because when going from 1 to to 2 means that, for each, the algorithm choose only additional tree. What that tree adds to the average will always bias it away from the true value. Then, as you go from 2 to 5, you add more trees so the bias of the 2nd tree is cancelled out. The top most right tree at k=50 gives the highest bias of -20.57. The sign of this number makes sense as the top right tree has the highest yield, and so trying to estimate it by averaging all the other trees will naturally involve a negative bias. It also make sense that the highest bias is in the top right as the underlying trend is quadratic. So, not only are the values to the top, right drastically higher than the bottom, left, they are also further from the average.**
+
+```{r knn-df, fig.width = 5, fig.height = 3, out.width = "100%", fig.align='center', fig.cap = "Bias-variance trade-off for KNN regression.", echo = FALSE, fig.pos='H'}
+# plot the bias, variance, and ETE
+overall_results %>% 
+  pivot_longer(-K, names_to = "metric", values_to = "Error") %>%
+  mutate(metric = fct_recode(metric,
+                             "Expected test error" = "expected_test_error",
+                             "Mean squared bias" = "mean_sq_bias",
+                             "Mean variance" = "mean_variance")) %>%
+  ggplot(aes(x = n/K, y = Error, colour = metric)) + 
+  labs(x = "df = n/K") +
+  geom_line() + 
+  geom_point() + 
+  theme_bw() + 
+  theme(legend.title = element_blank()) +
+  geom_line(aes(y= sigma^2/K), linetype="dashed", color = "black")
+```
+**In figure \@ref(fig:knn-df), the variance is a straight line. My formula is Var = $\sigma^2/k$ (where $\sigma^2$ is 16).**

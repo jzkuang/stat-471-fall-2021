@@ -32,7 +32,11 @@ In accordance with this policy,
 
 *Please list anyone you discussed this homework with:* 
 
+Alex Chen
+
 *Please list what external references you consulted (e.g. articles, books, or websites):*
+
+Stackoverflow, API
 
 ## Writeup {-}
 
@@ -59,12 +63,13 @@ library(glmnet)     # to run ridge and lasso
 library(ISLR2)      # necessary for College data 
 library(pROC)       # for ROC curves
 library(tidyverse)  
+library(glmnetUtils)
 ```
 
 We'll also need the `plot_glmnet` function from Unit 3 Lecture 3:
 ```{r}
 # install.packages("scales")              # dependency of plot_glmnet
-source("../../functions/plot_glmnet.R")
+source("../../functions/plot_glmnet.R")[]
 ```
 
 # Framingham Heart Study
@@ -73,7 +78,7 @@ Heart disease is the leading cause of the death in United States, accounting for
 
 Starting from the late 1940s, National Heart, Lung and Blood Institute (NHLBI) launched its famous Framingham Heart Study. By now subjects of three generations together with other people have been monitored and followed in the study. Over thousands research papers have been published using these longitudinal data sets.
 
-Using a piece of the data gathered at the beginning of the study, we illustrate how to identify risk factors of heart disease and how to predict this disease.
+Using a piece of the data gathered at the beginning of the study, we illustrate how to identify risk factors of heart disease and how to predict =this disease.
 
 The data contain the following eight variables for each individual:
 
@@ -94,18 +99,55 @@ The data contain the following eight variables for each individual:
 
 i. Import the data from `stat-471-fall-2021/data/Framingham.dat` into a tibble called `hd_data`, specifying all columns to be integers except `SEX`, which should be a factor. Rename `Heart Disease?` to `HD`, and remove any rows containing `NA` values using `na.omit()`.
 
+```{r import-heart, message = FALSE}
+# Importing the table
+hd_data <- read_csv(file = "../../data/Framingham.dat") %>% 
+  na.omit() %>% # Removing NA
+  rename("HD" = 'Heart Disease?') %>%
+  mutate_at(vars(SEX), # Specifying factors
+            list(factor)) %>% 
+  mutate_at(vars(-SEX), # Specifying integer
+            list(as.numeric))
+#sum(is.na(hd_data))
+```
+
+
 ii. What is the number of people in this data? What percentage of them have heart disease?
+
+```{r}
+count(hd_data)
+count(hd_data[hd_data$HD==1,])
+```
+**There are 1393 people in the data. 307/1393 or 22.03% of them have heart disease.
 
 iii. Split `hd_data` into training (80%) and test (20%) sets, using the rows in `train_samples` below for training. Store these in tibbles called `hd_train` and `hd_test`, respectively.
 ```{r}
 set.seed(5) # seed set for reproducibility (DO NOT CHANGE)
 n = nrow(hd_data)
 train_samples = sample(1:n, round(0.8*n))
+hd_train <- hd_data[train_samples,]
+hd_test <- hd_data[-train_samples,]
 ```
 
 iv. Display the age distribution in `hd_train` with a plot. What is the median age? 
 
+```{r heart-box}
+ggplot(hd_train, aes(x = AGE)) +
+  geom_bar(bins = 15) +
+  theme_bw()
+
+median(hd_train$AGE)
+```
+**The median age is 52.**
+
 v. Use a plot to explore the relationship between heart disease and systolic blood pressure in `hd_train`. What does this plot suggest?
+
+```{r heart-scatter}
+ggplot(hd_train, aes(x = SBP, y =HD)) +
+  geom_point() +
+  theme_bw()
+```
+**Most of the points for those with heart disease and those without have roughly similar systolic blood pressure levels. There is a lot of overlap between the two. However, it does appear that those with heart disease do have slightly higher levels.** 
 
 ## Univariate logistic regression
 
@@ -117,27 +159,120 @@ Let's take a look under the hood of logistic regression using a very small subse
 
 i. Define and print a new data frame called `hd_train_subset` containing `HD` and `SBP` for the individuals in `hd_train` who smoke (exactly) 40 cigarettes per week and have a cholesterol of at least 260.
 
+```{r hd-subset}
+hd_train_subset <- hd_train %>% 
+  filter(CIG == 40) %>% 
+  filter(CHOL >= 260) %>% 
+  select(HD, SBP)
+```
+
+
 ii. Write down the logistic regression likelihood function using the observations in `hd_train_subset`.
+
+**The logistic regression likelihood function is: $$\frac{(e^{\beta_{0} + \beta_{1}*190})*(e^{\beta_{0} + \beta_{1}*150})*(e^{\beta_{0} + \beta_{1}*130)}}{(1+e^{\beta_{0} + \beta_{1}*190})(1+e^{\beta_{0} + \beta_{1}*142})(1+e^{\beta_{0} + \beta_{1}*150})(1+e^{\beta_{0} + \beta_{1}*130})(1+e^{\beta_{0} + \beta_{1}*130})}$$**.
 
 iii. Find the MLE based on this subset using `glm()`. Given a value of `SBP`, what is the estimated probability $\mathbb P[\text{HD}=1|\text{SBP}]$?
 
+```{r subset-glm}
+hd_subset_fit <- glm(HD ~ SBP, data = hd_train_subset, family = "binomial")
+coef(hd_subset_fit)
+```
+**Remember to calculate the MLE you lazy bum**
+
+**The estimated probability of heart disease given a particular SBP is $$\frac{(e^{-0.9014 +   0.0101*SBP})}{(1 + e^{-0.9014 + 0.0101*SBP})}$$**
+
 iv. Briefly explain how the fitted coefficients in part iii were obtained from the formula in part ii. 
 
+**The coefficients in part 3 are the ones that maximize the function found in part 2. I believe R does this through the BFGS algorithm.**
+
 v. To illustrate this, fix the intercept at its fitted value and define the likelihood as a function of $\beta_1$. Then, plot this likelihood in the range [0, 0.1], adding a vertical line at the fitted value of $\beta_1$. What do we see in this plot? [Hints: Define the likelihood as a function in R via `likelihood = function(beta_1)(???)`. Use `stat_function()` to plot it.]
+
+```{r function}
+likelihood <- function(beta_1)(exp(-10.1427*3 + 470*beta_1)/(1+exp(-10.1427 + 190*beta_1))/(1+exp(-10.1427 + 142*beta_1))/(1+exp(-10.1427 + 150*beta_1))/(1+exp(-10.1427 + 130*beta_1))/(1+exp(-10.1427 + 130*beta_1)))
+ggplot() +
+  xlim(0, 0.1) +
+  stat_function(fun =likelihood) +
+  geom_vline(aes(xintercept=0.0737)) +
+  theme_bw()
+```
+
 
 ### Univariate logistic regression on the full data
 
 i. Run a univariate logistic regression of `HD` on `SBP` using the full training data `hd_train`. According to the estimated coefficient, how do the odds of heart disease change when `SBP` increases by 1? 
+```{r univariate-regression}
+hd_logistic <- glm(HD ~ SBP, hd_train, family = "binomial")
+coef(hd_logistic)
+```
+**The odds of heart disease are multiplied by by $e^{0.016}$.**
 
 ii. Plot the logistic regression fit along with a scatter plot of the data. Use `geom_jitter()` instead of `geom_point()` to better visualize the data. Based on the plot, roughly what is the estimated probability of heart disease for someone with `SBP` = 100?
+```{r}
+hd_train %>%
+  ggplot(aes(x = SBP, y = HD))+
+  geom_jitter(height = .05) +
+  geom_smooth(method = "glm",
+  formula = "y~x",
+  method.args = list(family = "binomial"),
+  se = FALSE) +
+  ylab("Prob(Heart Disease=1)") +
+  theme_bw()
+
+```
+
 
 ## Multiple logistic regression
 
 i. Run a multiple logistic regression of `HD` on all of the other variables in the data. Other things being equal, do the estimated coefficient suggest that males are more or less prone to heart disease? Other things being equal, what impact does an increase in `AGE` by 10 years have on the odds of heart disease (according to the estimated coefficients)?
 
+```{r multivariate-regression}
+hd_logistic_all <- glm(HD ~ ., hd_train, family = "binomial")
+coef(hd_logistic_all)
+```
+**Being male does seem to imply that people are more prone to heart disease, as the coefficient for SEXMALE is positive. Additionally, being older by ten years increases the odds of heart disease by $e^{0.615}$.**
+
 ii. Mary is a patient with the following readings: `AGE=50, SEX=FEMALE, SBP=110, DBP=80, CHOL=180, FRW=105, CIG=0`. According to the fitted model, what is the estimated probability Mary has heart disease? 
+```{r}
+mary <- tribble(
+  ~AGE, ~SEX, ~SBP, ~DBP, ~CHOL, ~FRW, ~CIG,
+  50, "FEMALE", 110, 80, 180, 105, 0
+)
+fitted_prob_mary <-  predict(hd_logistic_all,
+  newdata = mary,
+  type = "response") 
+head(fitted_prob_mary)
+```
 
 iii. What are the misclassification rate, false positive rate, and false negative rate of the logistic regression classifier (based on the probability threshold of 0.5) on `hd_test`? Print these in a nice table. Plot the ROC curve, and add a red point to the plot corresponding to the threshold of 0.5 (recalling that the true positive rate is one minus the false negative rate). What is the AUC? How does it compare to that of a classifier that guesses randomly?
+
+```{r test-results}
+fitted_probabilities = predict(hd_logistic_all,
+  newdata = hd_test,
+  type = "response") 
+predictions = as.numeric(fitted_probabilities > 0.5)
+hd_test <- hd_test %>% 
+  mutate(predicted_hd = predictions)
+hd_test %>%
+  select(HD, predicted_hd) %>%
+  table()
+
+```
+**The false positive rate is 5/312. The false negative rate is 51/57.**
+
+```{r test-auc}
+roc_data <-  roc(hd_test %>% pull(HD),
+  fitted_probabilities)
+
+tibble(FPR = 1-roc_data$specificities,
+  TPR = roc_data$sensitivities) %>%
+  ggplot(aes(x = FPR, y = TPR)) +
+  geom_line() +
+  geom_abline(slope = 1, linetype = "dashed") +
+  # geom_point(x = fpr, y = 1-fnr, colour = "red") +
+  theme_bw()
+
+```
+**The AUC is `roc_data$auc`.**
 
 # College Applications
 
@@ -178,10 +313,42 @@ Please use the training data `college_train` to answer the following EDA questio
 
 i. Create a histogram of `Accept`, with a vertical line at the median value. What is this median value? Which college has the smallest acceptance rate in the training data, and what is this rate? How does this acceptance rate (recall the data are from 1995) compare to the acceptance rate for the same university in 2020? Look up the latter figure on Google.
 
+```{r acceptance-dist}
+ggplot(college_train, aes(x=Accept)) +
+  geom_histogram() + 
+  theme_bw() +
+  geom_vline(aes(xintercept = median(college_train$Accept)))
+```
+```{r lowest-acceptance}
+college_train %>% 
+  filter(Accept == min(college_train$Accept))
+```
+
+**The college with the lowest acceptance rate is Harvard University at 15.6%. The acceptance rate in 2020 is 4.6%, which is a third of the 1995 rate.**
+
 ii. Produce separate plots to explore the relationships between `Accept` and the following three features: `Grad.Rate`, `Top10perc`, and `Room.Board`. 
+
+```{r}
+accept_grad <- ggplot(college_train, aes(x=Grad.Rate, y = Accept)) +
+  geom_point() +
+  theme_bw()
+accept_Top <- ggplot(college_train, aes(x=Top10perc, y = Accept)) +
+  geom_point() +
+  theme_bw()
+accept_Room <- ggplot(college_train, aes(x=Room.Board, y = Accept)) +
+  geom_point() +
+  theme_bw()
+accept_Room
+```
 
 iii. For the most selective college in the training data, what fraction of new students were in the top 10% of their high school class? For the colleges with the largest fraction of new students in the top 10% of their high school class (there may be a tie), what were their acceptance rates?
 
+```{r tophs-students}
+college_train %>% 
+  filter(Top10perc == max(college_train$Top10perc))
+```
+
+**90% of students admitted to Harvard were at the top 10% of their high school class. MIT has the highest fraction of new students in the top 10% of their high school class at 96%, and MIT had 33.4% acceptance rate.**
 ## Predictive modeling
 
 Now we will build some predictive models for `Accept`. For convenience, let's remove the `Name` variable from the training and test sets since it is not a feature we will be using for prediction:
@@ -190,22 +357,43 @@ college_train = college_train %>% select(-Name)
 college_test = college_test %>% select(-Name)
 ```
 
+
 ### Ordinary least squares
 
 i. Using the training set `college_train`, run a linear regression of `Accept` on the other features and display the regression summary. What fraction of the variation in the response do the features explain? 
 
+```{r}
+lm_fit <- lm(Accept~., data = college_train)
+summary(lm_acceptance)
+```
+**The value for R^{2} is 0.123, so 12.3% of the variation is explained by the regression.**
+
 ii. Do the signs of the fitted coefficients for `Grad.Rate`, `Top10perc`, and `Room.Board` align with the directions of the univariate relationships observed in part iii of the EDA section? 
+
+**For Grad.Rate, it does as the data appears to trend downward in the scatterplot and the coefficient is negative. For Top10perc, it does as the data trends downward in the scatterplot and the coefficient is negative. For Room.Board, it does as the data trends downward in the scatterplot and the coefficient is negative.**
 
 ### Ridge regression
 
 i. Fit a 10-fold cross-validated ridge regression to the training data and display the CV plot. What is the value of lambda selecting according to the one-standard-error rule? 
 ```{r}
 set.seed(3) # set seed before cross-validation for reproducibility
+ridge_fit = cv.glmnet(Accept ~ ., # formula notation, as usual
+  alpha = 0, # alpha = 0 for ridge
+  nfolds = 10, # number of folds
+  data = college_train) # data to run ridge on
 ```
+**The value of lambada according to the one-standard-error rule is `ridge_fit$lambda.1se`.**
 
 ii. UPenn is one of the colleges in the training set. During the above cross-validation process (excluding any subsequent refitting to the whole training data), how many ridge regressions were fit on data that included UPenn? 
 
+**There were 9 ridge regressions fitted on Upenn.**
+
 iii. Use `plot_glmnet` (introduced in Unit 3 Lecture 3) to visualize the ridge regression fitted coefficients, highlighting 6 features using the `features_to_plot` argument. By examining this plot, answer the following questions. Which of the highlighted features' coefficients change sign as lambda increases? Among the highlighted features whose coefficient does not change sign, which feature's coefficient magnitude does not increase monotonically as lambda decreases?
+
+```{r}
+plot_glmnet(ridge_fit, college_train, features_to_plot = 6)
+```
+
 
 iv. Let's collect the least squares and ridge coefficients into a tibble:
 ```{r}
@@ -215,6 +403,15 @@ coeffs = tibble(lm_coef = coef(lm_fit)[-1],
 coeffs
 ```
 Answer the following questions by calling `summarise` on `coeffs`. How many features' least squares and ridge regression coefficients have different signs? How many features' least squares coefficient is smaller in magnitude than their ridge regression coefficient?
+
+```{r}
+coeffs %>% 
+  summarise(
+    diff_signs = sum((lm_coef<0) == (ridge_coef<0)),
+    smaller_mag = sum(abs(lm_coef)<abs(ridge_coef))
+  )
+```
+**There were 13 coefficients that had different signs, but only three of the OLS coefficients had smaller magnitudes than their ridge regression counterparts.**
 
 v. Suppose instead that we had a set of training features $X^{\text{train}}$ such that $n_{\text{train}} = p$ and
 $$
@@ -227,17 +424,35 @@ Which of the following phenomena would have been possible in this case?
 - Having a feature's coefficients from least squares and ridge regression (the latter based on lambda.1se) have different signs
 - Having a feature's coefficient from least squares be smaller in magnitude than its coefficient from ridge regression (based on lambda.1se)
 
+**None of these are possible. In the simplified case presented, the ridge regression coefficient is the OLS coefficient divided by (1 + lambda). So, assuming lambda is positive, the ridge regression coefficient would always have the same sign as the OLS coefficient. This is true regardless of whether lambda decreases or increases. The ridge regression coefficient would also have a magnitude always smaller than that of OLS and would increase as lambda decreases.**
+
 ### Lasso regression
 
 i. Fit a 10-fold cross-validated lasso regression to the training data and display the CV plot.  
 
-```{r, message = FALSE}
+```{r lasso-cv, message = FALSE}
 set.seed(5) # set seed before cross-validation for reproducibility
+lasso_fit = cv.glmnet(Accept ~ ., # formula notation, as usual
+  alpha = 1, # alpha = 1 for lasso
+  nfolds = 10, # number of folds
+  data = college_train) # data to run lasso on
 ```
+
+```{r lasso-cv-plot}
+plot(lasso_fit)
+```
+
 
 ii. How many features (excluding the intercept) are selected if lambda is chosen according to the one-standard-error rule?
 
+**Around eight features are chosen according to the one-standard-error rule.**
+
 iii. Use `plot_glmnet` to visualize the lasso fitted coefficients, which by default will highlight the features selected by the lasso. By examining this plot, answer the following questions. Which feature is the first to enter the model as lambda decreases? Which feature has the largest absolute coefficient for the most flexibly fitted lasso model? 
+
+```{r glmnet-plot-lasso}
+plot_glmnet(lasso_fit, college_train)
+```
+
 
 ### Test set evaluation
 
