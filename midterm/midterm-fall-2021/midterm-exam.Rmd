@@ -1,6 +1,10 @@
 ---
 title: 'STAT 471: Midterm Exam'
+<<<<<<< HEAD
 author: 'James Kuang'
+=======
+author: 'Name'
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 date: 'October 25, 2021, 7:00-9:00pm'
 output:
   bookdown::pdf_document2:
@@ -49,12 +53,16 @@ The data come in two parts: Case and death tracking data from The New York Times
 - Import the county health data from `../../data/county_health_data.tsv` into a tibble called `county_health_data`. Print this tibble (no need to make a fancy table out of it).
 
 ```{r}
+<<<<<<< HEAD
 # importing the data
 url = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
 case_data_raw <- read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
 case_data_raw
 county_health_data <- read_tsv(file = "../../data/county_health_data.tsv")
 county_health_data
+=======
+url = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 ```
 
 ## Transform (15 points)
@@ -62,6 +70,7 @@ county_health_data
 The NYT data contain case and death information for both 2020 and 2021, whereas we would like to focus our analysis only on 2020. Also, the data are broken down by day, whereas we would like to calculate an overall case-fatality ratio per county, defined as the total deaths in 2020, divided by the total cases in 2020, multiplied by 100 to obtain a percentage.
 
 - Transform `case_data_raw` into a tibble called `case_data` with one row per county and four columns: `fips`, `county`, `state`, and `case_fatality_rate`, the latter containing the overall case-fatality ratio for 2020. [Hints: (1) There are several ways to filter the observations from 2020, but some are slower than others. For a faster option, check out the `year()` function from the `lubridate` package. (2) To keep columns in a tibble after `summarise()`, include them in `group_by()`. Just remember to `ungroup()` after summarizing.]
+<<<<<<< HEAD
 
 ```{r clean-data}
 # summarizing the data
@@ -84,10 +93,15 @@ length(unique(county_health_data$fips))
 ```
 **There are 3273 counties in case_data, but there are only 935 counties in `county_health_data`. The likely cause of this is that it is much harder to compile a set of all 41 health indicators in the `county_health_data` then it is covid cases/deaths. More counties are willing to not only spend the time and resources making the covid data publicly available compared to the socioeconomic data but also collect the covid data in the first place.**  
 
+=======
+- Print the resulting tibble (no need to make a fancy table out of it). How many counties are represented in `case_data`? How does it compare to the number of counties in `county_health_data`? What is a likely explanation for this discrepancy?
+
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 ## Merge (5 points)
 
 - Merge `county_health_data` with `case_data` into one tibble called `covid_data` using `inner_join()`, which keeps counties represented in both datasets. See `?inner_join` or Google for documentation and examples. Print `covid_data` (no need to create a nice table).
 
+<<<<<<< HEAD
 ```{r join-table}
 #joining data
 covid_data <- inner_join(county_health_data, case_data, by = "fips")
@@ -95,11 +109,14 @@ covid_data
 ```
 
 
+=======
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 # Exploration (30 points for correctness; 5 points for presentation)
 
 ## Response distribution (15 points)
 
 - Compute the median of the case-fatality rate in `covid_data`.
+<<<<<<< HEAD
 
 ```{r}
 # calculating median
@@ -134,6 +151,12 @@ covid_data %>%
 ```
 
 ```{r heatmap, echo = FALSE}
+=======
+- Create a histogram of the case-fatality rate in `covid_data`, with a dashed vertical line at the median. Comment on the shape of this distribution.
+- Create a (nice) table of the top 10 counties by case-fatality rate, as well as a heatmap of the case-fatality rate across the U.S. (the code to produce the heatmap is provided in the Rmd file; no need to modify it at all). Based on the table, what region of the U.S. tended to have the highest overall case-fatality rates in 2020? In what sense does the heatmap reflect this?
+
+```{r, echo = FALSE}
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 # create a heatmap of case fatality rate across the U.S.
 map_data("county") %>%
   as_tibble() %>% 
@@ -153,13 +176,17 @@ map_data("county") %>%
   scale_fill_gradient(low = "blue", high = "red") +
   theme_void()
 ```
+<<<<<<< HEAD
 **In Table \@ref(tab:deadliest-counties), we can see that the deadliest counties appear the northeast (specifically around New York). This is reflected in Figure \@ref(tab:heatmap), where there are spots of red around the city of New York. This also matches my intuition as I know New York was hit hard, partly due to Cuomo's mismanagement and partly because it was hit early.**
 
+=======
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 
 ## Response-feature relationships (15 points)
 
 - To prevent selection bias, it's good practice to split off a test set before exploring response-feature relationships. Create a test set `covid_test` by filtering counties belonging to the first six states (in alphabetical order) that are represented in `covid_data`; these should be Alabama, Arizona, Arkansas, California, Colorado, and Connecticut. Create a training set `covid_train` containing the rest of the counties.
 
+<<<<<<< HEAD
 ```{r}
 covid_test <- covid_data %>% 
   filter(state %in% c("Alabama", "Arizona", 
@@ -212,6 +239,12 @@ plot_grid(obesity, uinsured, segregation, housing, ncol = 2)
 
 **High housing costs appears to have the strongest relationship with case-fatality-ratio with a positive relationship between housing costs and case fatality rates. This relationship is likely due to the fact that communities burdened by high housing costs are likely to be poorer. This means that they can't afford adequate medical care. This variable is also likely to correlate with majority minority communities, which often are the victims of prejudiced medical care.**
 
+=======
+- The features come in four different categories: health behaviors, clinical care, social and economic factors, and physical environment. Create scatter plots of the case fatality ratio against one feature in each of these categories (`obesity_perc`, `uninsured`, `segregation_nonwhite_white`, `high_housing_costs`), adding the least squares line to each and putting the y-axis on a log scale using `scale_y_log10()` for visualization purposes and collating these plots into a single figure. 
+
+- Which of these four features appears to have the strongest relationship with the case-fatality ratio? What appears to be the direction of the relationship, and why might this relationship exist?
+
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 # Modeling (30 points for correctness; 5 points for presentation)
 
 Next, let's train penalized regression models to predict the case-fatality ratio based on the available features.
@@ -221,14 +254,18 @@ Next, let's train penalized regression models to predict the case-fatality ratio
 - Fit a 10-fold cross-validated ridge regression to `covid_train`.
 ```{r}
 set.seed(1)  # for replicability (do not change)
+<<<<<<< HEAD
 ridge_fit = cv.glmnet(case_fatality_rate ~ ., # formula notation, as usual
                       alpha = 0, # alpha = 0 for ridge
                       nfolds = 10, # number of folds
                       data = covid_train) # data to run ridge on
+=======
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 ```
 
 - Produce the corresponding CV plot. What are `lambda.min` and `lambda.1se`, and where are these two indicated in the CV plot? 
 
+<<<<<<< HEAD
 ```{r cv-ridge, fig.width = 6.5, fig.height= 4.5, out.width= "60%", fig.align= 'center', fig.cap="Ridge Fit CV Errors", fig.pos="H"}
 plot(ridge_fit)
 ```
@@ -249,19 +286,27 @@ tibble(coef = as.vector(coef(ridge_fit, s = "lambda.1se")),
 ```
 
 **In Figure \@ref(fig:trace), the figure with the most negative impact is teen_births. This does not have an immediate relationship, but it could signal a lot of young people who are less likely to die. However, there is also no statistically significant relationship between this feature and the case-fatality rate, as penalized regressions do not usually have p-values associated to them.**
+=======
+- Produce the ridge trace plot, highlighting the top 6 features. Based on `lambda.1se`, which feature appears to have the strongest negative impact on the case-fatality ratio? Is the reason for this relationship apparent to you? Does this ridge regression result imply a statistically significant relationship between this feature and the case-fatality rate?
+
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 ## Lasso regression (14 points)
 
 - Fit a 10-fold cross-validated lasso regression to `covid_train`.
 ```{r}
 set.seed(1)  # for replicability (do not change)
+<<<<<<< HEAD
 lasso_fit = cv.glmnet(case_fatality_rate ~ ., # formula notation, as usual
                       alpha = 1, # alpha = 0 for ridge
                       nfolds = 10, # number of folds
                       data = covid_train) # data to run ridge on
+=======
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 ```
 
 - Produce the corresponding CV plot. What is another name for the model represented in the left-most edge of the CV plot? Why does it perform poorly?
 
+<<<<<<< HEAD
 ```{r cv-lasso, fig.width = 4.5, fig.height= 4.5, out.width= "60%", fig.align= 'center', fig.cap="Lasso Fit CV Errors", fig.pos="H"}
 plot(lasso_fit)
 ```
@@ -309,10 +354,20 @@ tibble(coef = as.vector(coef(lasso_fit, s = "lambda.1se")),
 ```
 
 **The coefficient for flu_vaccine_perc is 0.00242 This means that the feature is not influencing the regression at the lambda.1se value. Since it is positive, perhaps it is a sign that a county is more health conscious and willing to take precautions.**
+=======
+- How many features with nonzero coefficients are there in the lasso model selected by the one-standard error rule? 
+
+- Produce the lasso trace plot, highlighting the top 6 features. What is the first feature entering the model with a positive coefficient? What is the first feature entering the model with a negative coefficient?
+
+- Produce a nice table of all features with nonzero coefficients in the lasso model selected by the one-standard-error rule, ordered by their coefficient magnitudes. What is the coefficient of `flu_vaccine_perc`, and how do we interpret it? Comment on the sign of this coefficient.
+
+
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 ## Performance evaluation (8 points)
 
 - Evaluate the RMSE of the ridge and lasso methods, both with `lambda` chosen using the one-standard-error-rule. For the sake of comparison, also evaluate the RMSE of the intercept-only prediction rule, which predicts the mean case-fatality ratio in the training data for all counties. Print these three RMSE values in a nice table.
 
+<<<<<<< HEAD
 ```{r}
 lasso_predictions = predict(lasso_fit,
   newdata = covid_test,
@@ -340,6 +395,8 @@ kable_styling(position = "center", latex_options = "HOLD_position")
 ```
 
 
+=======
+>>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 - Which of the two penalized regression methods performs better, and how does its performance compare to the intercept-only model? Contextualize the latter comparison in terms of the bias-variance trade-off. 
 
 # Appendix: Descriptions of features

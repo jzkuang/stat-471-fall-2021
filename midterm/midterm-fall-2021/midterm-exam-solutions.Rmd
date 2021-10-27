@@ -1,0 +1,429 @@
+---
+title: 'STAT 471: Midterm Exam Solutions'
+author: 'Eugene Katsevich'
+date: 'October 25, 2021, 7:00-9:00pm'
+output:
+  bookdown::pdf_document2:
+    number_sections: yes
+    toc: yes
+    toc_depth: '3'
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+options(scipen = 0, digits = 3)  # controls number of significant digits printed
+```
+
+# Instructions {-}
+
+The materials you need for this exam are available [here](https://upenn.box.com/s/oqdogllv68vf52qt6h0u95blmfbd1462). Please navigate to this site and download the files you find there. Place `midterm-exam.Rmd` under `stat-471-fall-2021/midterm/midterm-fall-2021/` and `county-health-data.tsv` under `stat-471-fall-2021/data/`.
+
+Use this document as a starting point for your writeup, adding your solutions after "**Solution**". Add your R code using code chunks and add your text answers using **bold text**. Compile your writeup to PDF and submit to [Gradescope](https://www.gradescope.com/courses/285259). 
+
+**You must complete this exam individually, but you may consult any course materials or the internet.**
+
+We'll need to use the following `R` packages and functions:
+```{r, message = FALSE}
+library(kableExtra)                     # for printing tables
+library(cowplot)                        # for side by side plots
+library(glmnetUtils)                    # to run ridge and lasso
+library(lubridate)                      # for dealing with dates
+library(maps)                           # for creating maps
+source("../../functions/plot_glmnet.R") # for lasso/ridge trace plots
+library(tidyverse)                      # for everything else
+```
+
+\newpage 
+
+# Socioeconomics and the COVID-19 case-fatality rate {-}
+
+The coronavirus pandemic emerged in 2020 and is still impacting our lives today. COVID-19 has had a disparate impact on different counties across the United States. A key measure of this impact is the *case-fatality ratio*, defined as the ratio of the number of deaths to the number of cases. Three STAT 471 students from spring 2021 set out to study how a variety of variety of health, clinical, socioeconomic, and physical factors affected the case-fatality ratio. In this exam, we will be retracing their steps. The analysis will focus on the data from 2020, before the availability of COVID vaccines.
+
+The data come in two parts: Case and death tracking data from The New York Times (available [online](https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv)) and 41 county-level health and socioeconomic factors compiled by the [County Health Rankings and Roadmaps](https://www.countyhealthrankings.org/), available to you as `county_health_data.tsv` (see the Appendix below for descriptions of each variable in this dataset). The county health data have been cleaned for you, and counties with missing data have been removed. Counties are identified in both datasets using a five-digit *FIPS code*.
+
+# Wrangling
+
+## Import
+
+- Import the NYT data directly from the URL below into a tibble called `case_data_raw`. Print this tibble (no need to make a fancy table out of it).
+- Import the county health data from `../../data/county_health_data.tsv` into a tibble called `county_health_data`. Print this tibble (no need to make a fancy table out of it).
+
+```{r, message = FALSE}
+# read case data from URL
+url = "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+case_data_raw = read_csv(url)
+
+# read county health data from file
+county_health_data = read_tsv("../../data/county_health_data.tsv")
+
+# print the two tibbles
+case_data_raw
+county_health_data
+```
+
+## Transform
+
+The NYT data contain case and death information for both 2020 and 2021, whereas we would like to focus our analysis only on 2020. Also, the data are broken down by day, whereas we would like to calculate a single case-fatality ratio per county, defined as the total deaths in 2020, divided by the total cases in 2020, multiplied by 100 to obtain a percentage.
+
+- Transform `case_data_raw` into a tibble called `case_data` with one row per county and four columns: `fips`, `county`, `state`, and `case_fatality_rate`. [Hints: (1) There are several ways to filter the observations from 2020, but some are slower than others. For a faster option, check out the `year()` function from the `lubridate` package. (2) To keep columns in a tibble after `summarise()`, include them in `group_by()`. Just remember to `ungroup()` after summarizing.]
+- Print the resulting tibble (no need to make a fancy table out of it). How many counties are represented in `case_data`? How does it compare to the number of counties in `county_health_data`? What is a likely explanation for this discrepancy?
+
+```{r, message = FALSE}
+# wrangle case data
+case_data = case_data_raw %>%
+  na.omit() %>%                               # remove NA values
+  filter(year(date) == 2020) %>%              # keep data from 2020 
+  group_by(fips, county, state) %>%           # group by county
+  summarise(total_cases = sum(cases),         # total cases per county
+            total_deaths = sum(deaths)) %>%   # total deaths per county
+  ungroup() %>%
+  mutate(case_fatality_rate =                 # case_fatality_rate = 
+           total_deaths/total_cases*100) %>%  #  total_deaths/total_cases
+  select(-total_cases, -total_deaths)         # remove intermediate variables
+
+# print case data
+case_data
+```
+
+**There are 3140 counties represented in the NYT data. This is a much greater number than the number of counties represented in the county health data, which is only 935. This is likely because the county health data was not available for many counties.**
+
+## Merge
+
+- Merge `county_health_data` with `case_data` into one tibble called `covid_data` using `inner_join()`, which keeps counties represented in both datasets. See `?inner_join` or Google for documentation and examples. Print `covid_data` (no need to create a nice table).
+
+```{r, message = FALSE}
+# join county health data with case data
+covid_data = inner_join(county_health_data, case_data, by = "fips")
+covid_data
+```
+
+# Exploration
+
+## Response distribution
+
+- Compute the median of the case-fatality rate in `covid_data`.
+```{r}
+# calculate median case fatality rate
+median_case_fatality_rate = covid_data %>%
+  summarise(median(case_fatality_rate)) %>%
+  pull()
+```
+**The median of the case-fatality rate is `r covid_data %>% summarise(median(case_fatality_rate)) %>% pull()`%.**
+
+- Create a histogram of the case-fatality rate in `covid_data`, with a dashed vertical line at the median. Comment on the shape of this distribution.
+
+```{r response-histogram, fig.width = 5, fig.height = 3, out.width = "80%", fig.cap = "Distribution of case-fatality rate; vertical dashed line indicates the median.", fig.align='center'}
+# plot histogram of case fatality rate
+covid_data %>%
+  ggplot(aes(x = case_fatality_rate)) + 
+  geom_histogram() +
+  geom_vline(xintercept = median_case_fatality_rate,
+             linetype = "dashed") +
+  labs(x = "Case fatality rate (percent)", 
+       y = "Number of counties") +
+  theme_bw()
+```
+
+**Figure \@ref(fig:response-histogram) shows a histogram of the case-fatality rate. Most counties have case-fatality rates roughly between 1% and 3%, but there is a long right tail of counties with substantially higher rates.**
+
+- Create a (nice) table of the top 10 counties by case-fatality rate, as well as a heatmap of the case-fatality rate across the U.S. by running the code below. Based on this table and plot, what region of the U.S. tended to have the highest overall case-fatality rates?
+
+```{r top-10-counties}
+# examine top 10 counties by case fatality rate
+covid_data %>% 
+  select(county, state, case_fatality_rate) %>%
+  arrange(desc(case_fatality_rate)) %>%
+  head(10) %>%
+  kable(format = "latex", row.names = NA, 
+        booktabs = TRUE, digits = 2, 
+        col.names = c("County", "State", "Case-fatality rate"),
+        caption = "Top ten counties by case-fatality rate 
+        (expressed as a percentage).") %>%
+  kable_styling(position = "center")
+```
+
+```{r heatmap, fig.width = 7, fig.height = 4, out.width = "100%", fig.cap = "Geographic distribution of the case-fatality rate across the US in 2020.", fig.align='center', echo = FALSE}
+# create a heatmap of case fatality rate across the U.S.
+map_data("county") %>%
+  as_tibble() %>% 
+  left_join(case_data %>% 
+              rename(region = state, 
+                     subregion = county,
+                     `Case Fatality Rate` = case_fatality_rate) %>% 
+              mutate(region = str_to_lower(region), 
+                     subregion = str_to_lower(subregion)), 
+            by = c("region", "subregion")) %>%
+  ggplot() + 
+  geom_polygon(data=map_data("state"), 
+               aes(x=long, y=lat, group=group),
+               color="black", fill=NA,  size = 1, alpha = .3) + 
+  geom_polygon(aes(x=long, y=lat, group=group, fill = `Case Fatality Rate`),
+               color="darkblue", size = .1) +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_void()
+```
+
+**Table \@ref(tab:top-10-counties) shows the top ten counties by case-fatality rate and Figure \@ref(fig:heatmap) shows the geographic distribution of this metric across the U.S. It is apparent that the northeast suffered from the highest case-fatality rates.**
+
+## Response-feature relationships
+
+- To prevent selection bias, it's good practice to split off a test set before exploring response-feature relationships. Create a test set `covid_test` by filtering counties belonging to the first six states (in alphabetical order) that are represented in `covid_data`; these should be Alabama, Arizona, Arkansas, California, Colorado, and Connecticut. Create a training set `covid_train` containing the rest of the counties.
+
+```{r}
+# split into train and test
+test_states = c("Alabama", "Arizona", "Arkansas", 
+                "California", "Colorado", "Connecticut")
+covid_train = covid_data %>% filter(!(state %in% test_states))
+covid_test = covid_data %>% filter(state %in% test_states)
+```
+
+- The features come in four different categories: health behaviors, clinical care, social and economic factors, and physical environment. Create scatter plots of the case fatality ratio against one feature in each of these categories (`obesity_perc`, `uninsured`, `segregation_nonwhite_white`, `high_housing_costs`), adding the least squares line to each and putting the y-axis on a log scale using `scale_y_log10()` for visualization purposes and collating these plots into a single figure. 
+
+```{r response-v-features, fig.width = 7, fig.height = 6, out.width = "100%", fig.cap = "Case-fatality rate plotted against one feature in each of the four categories.", fig.align='center'}
+# plot case_fatality_rate against obesity_perc
+p1 = covid_train %>%
+  ggplot(aes(x = obesity_perc, y = case_fatality_rate)) +
+  geom_point() + 
+  scale_y_log10() +
+  geom_smooth(method = "lm", formula = "y~x", se = FALSE) +
+  labs(x = "Obesity percentage", 
+       y = "Case Fatality Ratio",
+       title = "Obesity percentage") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+# plot case_fatality_rate against uninsured
+p2 = covid_train %>%
+  ggplot(aes(x = uninsured, y = case_fatality_rate)) +
+  geom_point() + 
+  scale_y_log10() +
+  geom_smooth(method = "lm", formula = "y~x", se = FALSE) +
+  labs(x = "Percent uninsured", 
+       y = "Case Fatality Ratio",
+       title = "Percent uninsured") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+# plot case_fatality_rate against segregation_nonwhite_white
+p3 = covid_train %>%
+  ggplot(aes(x = segregation_nonwhite_white, y = case_fatality_rate)) +
+  geom_point() + 
+  scale_y_log10() +
+  geom_smooth(method = "lm", formula = "y~x", se = FALSE) +
+  labs(x = "Residential segregation", 
+       y = "Case Fatality Ratio",
+       title = "Residential segregation") +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))  
+
+# plot case_fatality_rate against high_housing_costs
+p4 = covid_train %>%
+  ggplot(aes(x = high_housing_costs, y = case_fatality_rate)) +
+  geom_point() + 
+  scale_y_log10() +
+  geom_smooth(method = "lm", formula = "y~x", se = FALSE) +
+  labs(x = "High housing costs", 
+       y = "Case Fatality Ratio",
+       title = "High housing costs") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))  
+
+# combine the plots
+cowplot::plot_grid(p1, p2, p3, p4, nrow = 2)
+```
+
+- Which of these four features appears to have the strongest relationship with the case-fatality ratio? What appears to be the direction of the relationship, and why might this relationship exist?
+
+**Figure \@ref(fig:response-v-features) shows how the case-fatality ratio varies with each of the four given features. There appear to be relationships between the case fatality rate and residential segregation and high housing costs, with the former perhaps a bit stronger. This suggests that highly segregated counties have higher case-fatality ratios. This may be the case because residents of highly segregated counties may have less access to healthcare resources.**
+
+# Modeling
+
+Next, let's train penalized regression models to predict the case-fatality ratio based on the available features.
+
+## Ridge regression
+
+- Fit a 10-fold cross-validated ridge regression to `covid_train`.
+```{r}
+set.seed(1)
+ridge_fit = cv.glmnet(case_fatality_rate ~ . - state - county - fips,   
+                      alpha = 0,                 
+                      nfolds = 10,               
+                      data = covid_train)
+```
+
+- Produce the corresponding CV plot. What are `lambda.min` and `lambda.1se`, and where are these two indicated in the CV plot? 
+```{r ridge-CV-plot, fig.width = 6, fig.height = 4, out.width = "80%", fig.cap = "Ridge CV plot.", fig.align='center'}
+plot(ridge_fit)
+```
+
+**Figure \@ref(fig:ridge-CV-plot) shows the CV plot for ridge regression. We have `lambda.min` = `r ridge_fit$lambda.min` and `lambda.1se` = `r ridge_fit$lambda.1se`. These two are indicated in the plot as the left and right vertical dashed lines, respectively.**
+
+- Produce the ridge trace plot, highlighting the top 6 features. Based on `lambda.1se`, which feature appears to have the strongest negative impact on the case-fatality ratio? Is the reason for this relationship apparent to you? Does this ridge regression result imply a statistically significant relationship between this feature and the case-fatality rate?
+
+```{r ridge-trace-plot, fig.width = 6, fig.height = 4, out.width = "80%", fig.cap = "Ridge trace plot.", fig.align='center'}
+plot_glmnet(ridge_fit, covid_train, features_to_plot = 6)
+```
+
+```{r}
+extract_std_coefs(ridge_fit, covid_train) %>%
+  arrange(coefficient) %>%
+  head(1)
+```
+
+**The feature `smoke_perc` appears to have the strongest negative impact on the case-fatality rate, i.e. higher smoking percentages imply lower case-fatality rates. The reason for this relationship is not apparent, and the ridge regression result does not imply a statistically significant relationship.**
+
+## Lasso regression
+
+- Fit a 10-fold cross-validated lasso regression to `covid_train`.
+```{r}
+set.seed(1)
+lasso_fit = cv.glmnet(case_fatality_rate ~ . - state - county - fips,   
+                      alpha = 1,                 
+                      nfolds = 10,               
+                      data = covid_train)
+```
+
+- Produce the corresponding CV plot. What is another name for the model represented in the left-most edge of the CV plot? Why does it perform poorly?
+```{r lasso-CV-plot, fig.width = 6, fig.height = 4, out.width = "80%", fig.cap = "Lasso CV plot.", fig.align='center'}
+plot(lasso_fit)
+```
+
+**Figure \@ref(fig:lasso-CV-plot) shows the lasso CV plot. The leftmost edge corresponds to $\lambda \approx 0$, i.e. the ordinary linear regression model. It does not appear to perform poorly in the CV plot, but if it does perform poorly, it would be due to high variance.**
+
+- How many features with nonzero coefficients are there in the lasso model selected by the one-standard error rule? 
+```{r}
+lasso_fit$nzero[lasso_fit$lambda == lasso_fit$lambda.1se]
+```
+
+**The number of features with nonzero coefficients is `r lasso_fit$nzero[lasso_fit$lambda == lasso_fit$lambda.1se]`.**
+
+- Produce the lasso trace plot, highlighting the top 6 features. What is the first feature entering the model with a positive coefficient? What is the first feature entering the model with a negative coefficient?
+```{r lasso-trace-plot, fig.width = 6, fig.height = 4, out.width = "80%", fig.cap = "Lasso trace plot.", fig.align='center'}
+plot_glmnet(lasso_fit, covid_train, features_to_plot = 6)
+```
+
+**Figure \@ref(fig:lasso-trace-plot) shows the lasso trace plot. The first feature entering the model with a positive coefficient is `segregation_nonwhite_white`. The first feature entering the model with a negative coefficient is not apparent from the trace plot.**
+
+- Produce a nice table of all features with nonzero coefficients in the lasso model selected by the one-standard-error rule, ordered by their coefficient magnitudes. What is the coefficient of `flu_vaccine_perc`, and how do we interpret it? Comment on the sign of this coefficient.
+```{r lasso-coefficients}
+beta_hat_std = extract_std_coefs(lasso_fit, covid_train)
+beta_hat_std %>%
+  filter(coefficient != 0) %>%
+  arrange(desc(abs(coefficient))) %>% 
+  kable(format = "latex", row.names = NA, 
+        booktabs = TRUE, digits = 2, 
+        col.names = c("Feature", "Coefficient"),
+        caption = "Standardized coefficients for features in the lasso 
+        model based on the one-standard-error rule.") %>%
+  kable_styling(position = "center")
+```
+
+**Table \@ref(tab:lasso-coefficients) shows the standardized coefficients for features in the lasso model based on the one-standard-error rule. The coefficient of `flu_vaccine_perc` is `r beta_hat_std %>% filter(feature == "flu_vaccine_perc") %>% pull(coefficient)`. Checking the data, we see that `flu_vaccine_perc` is coded as a decimal. Therefore, an additional 1% vaccinated against the flu leads to an increase in the case-fatality percent by `r beta_hat_std %>% filter(feature == "flu_vaccine_perc") %>% pull(coefficient)`. One would expect higher flu vaccination rates to lead to lower case-fatality ratios.**
+
+## Performance evaluation
+
+- Evaluate the RMSE of the ridge and lasso methods, both with `lambda` chosen using the one-standard-error-rule. For the sake of comparison, also evaluate the RMSE of the intercept-only prediction rule, which predicts the mean case-fatality ratio in the training data for all counties. Print these three RMSE values in a nice table.
+```{r prediction-errors}
+# ridge prediction error
+ridge_predictions = predict(ridge_fit, 
+                            newdata = covid_test, 
+                            s = "lambda.1se") %>%
+  as.numeric()
+ridge_RMSE = sqrt(mean((ridge_predictions-covid_test$case_fatality_rate)^2))
+
+# lasso prediction error
+lasso_predictions = predict(lasso_fit, 
+                            newdata = covid_test, 
+                            s = "lambda.1se") %>%
+  as.numeric()
+lasso_RMSE = sqrt(mean((lasso_predictions-covid_test$case_fatality_rate)^2))
+
+# intercept-only prediction error
+training_mean_response = mean(covid_train$case_fatality_rate)
+constant_RMSE = sqrt(mean((training_mean_response-covid_test$case_fatality_rate)^2))
+
+# print nice table
+tibble(Ridge = ridge_RMSE, Lasso = lasso_RMSE, `Intercept-only` = constant_RMSE) %>%
+   kable(format = "latex", row.names = NA,
+       booktabs = TRUE, digits = 2,
+       caption = "Root-mean-squared prediction errors for lasso, ridge,
+       and intercept-only models.") %>%
+ kable_styling(position = "center")
+```
+
+**Table \@ref(tab:prediction-errors) shows the root-mean-squared prediction errors for lasso, ridge, and intercept-only models.**
+
+- Which of the two penalized regression methods performs better, and how does its performance compare to the intercept-only model? Contextualize the latter comparison in terms of the bias-variance trade-off. 
+
+**We see that ridge performs (marginally) better than lasso, and both of these penalized regression methods perform somewhat worse than the intercept-only model. This suggests that variance is high in this problem, meaning that simpler models can perform as well or better than more complex models.**
+
+# Appendix: Descriptions of features
+
+Below are the 41 features we used for analysis. Words written in parentheses represent variable names. Unless noted otherwise, all variables are continuous. 
+
+**Health behaviors:** 
+
+- *Tobacco Use*
+  - Adult smoking (`smoke_perc`): Percentage of adults who are current smokers.
+- *Diet and Exercise* 
+  - Adult obesity (`obesity_perc`): Percentage of the adult population (age 20 and older) reporting a body mass index (BMI) greater than or equal to 30 kg/m2.
+  - Food environment index (`food_environment`): Index of factors that contribute to a healthy food environment, from 0 (worst) to 10 (best).
+  - Physical inactivity (`inactive_perc`): Percentage of adults age 20 and over reporting no leisure-time physical activity.
+  - Access to exercise opportunities (`physical_exercise_opportunities`): Percentage of population with adequate access to locations for physical activity
+  - Food insecurity (`Food_Insecure_perc`): Percentage of population who lack adequate access to food.
+  - Limited access to healthy foods (`limited_healthy_access`): Percentage of population who are low-income and do not live close to a grocery store.
+- *Alcohol & Drug Use*
+  - Excessive Drinking (`drinking_perc`): Percentage of adults reporting binge or heavy drinking.
+- *Sexual Activity*
+  - Sexually transmitted infections (`stis`): Number of newly diagnosed chlamydia cases per 100,000 population.
+  - Teen births (`teen_births`): Number of births per 1,000 female population ages 15-19.
+  - Low Birth Weight Percentage (`low_birthweight_percentage`): Percentage of live births with low birthweight (< 2,500 grams).
+
+**Clinical care:**
+
+- *Access to Care*
+  - Uninsured (`uninsured`): Percentage of population under age 65 without health insurance.
+  - Primary care physicians (`primarycare_ratio`): Ratio of population to primary care physicians.
+  - Dentists (`dentist_ratio`): Ratio of population to dentists. 
+  - Mental health providers (mentalhealth_ratio): Ratio of population to mental health providers.
+  - Other primary care providers (`otherproviders_ratio`): Ratio of population to primary care providers other than physicians.
+- *Quality of Care*
+  - Preventable hospital stays (`preventable_hospitalization`): Rate of hospital stays for ambulatory-care sensitive conditions per 100,000 Medicare enrollees.
+  - Mammography screening (`mammogram_perc`): Percentage of female Medicare enrollees ages 65-74 that received an annual mammography screening.
+  - Flu vaccinations (`flu_vaccine_perc`): Percentage of fee-for-service (FFS) Medicare enrollees that had an annual flu vaccination.
+  - Teen births (`teen_births`): Number of births per 1,000 female population ages 15-19.
+
+**Social and economic factors:** 
+
+- *Education*
+  - High school completion (`HS_completion`): Percentage of adults ages 25 and over with a high school diploma or equivalent.
+  - Some college (`some_college`): Percentage of adults ages 25-44 with some post-secondary education.
+  - Disconnected youth (`disconnected_youth`): Percentage of teens and young adults ages 16-19 who are neither working nor in school.
+- *Employment*
+  - Unemployment (`unemployment`): Percentage of population ages 16 and older who are unemployed but seeking work.
+- *Income* 
+  - Children in poverty (`children_poverty_percent`): Percentage of people under age 18 in poverty.
+  - Income inequality (`income_inequality`): Ratio of household income at the 80th percentile to income at the 20th percentile.
+  - Median household income (`median_income`): The income where half of households in a county earn more and half of households earn less.
+  - Children eligible for free or reduced price lunch (`children_freelunches`): Percentage of children enrolled in public schools that are eligible for free or reduced price lunch.
+- *Family & Social Support*
+  - Children in single-parent households (`single_parent_households`): Percentage of children that live in a household headed by a single parent.
+  - Social associations (`social_associations`): Number of membership associations per 10,000 residents. 
+  - Residential segregation—Black/White (`segregation_black_white`): Index of dissimilarity where higher values indicate greater residential segregation between Black and White county residents.
+  - Residential segregation—non-White/White (`segregation_nonwhite_white`): Index of dissimilarity where higher values indicate greater residential segregation between non-White and White county residents.
+- *Community Safety*
+  - Violent crime rate (`Violent_crime`) Number of reported violent crime offenses per 100,000 residents. 
+
+**Physical environment:**
+
+- *Air & Water Quality*
+  - Air pollution - particulate matter (`air_pollution`): Average daily density of fine particulate matter in micrograms per cubic meter (PM2.5).
+  - Drinking water violations (`water_violations`): Indicator of the presence of health-related drinking water violations. 1 indicates the presence of a violation, 0 indicates no violation.
+- *Housing & Transit*
+  - Housing overcrowding (`housing_overcrowding`): Percentage of households with overcrowding, 
+  - Severe housing costs (`high_housing_costs`): Percentage of households with high housing costs
+  - Driving alone to work (`driving_alone_perc`): Percentage of the workforce that drives alone to work.
+  - Long commute—driving alone (`long_commute_perc`): Among workers who commute in their car alone, the percentage that commute more than 30 minutes.
+  - Traffic volume (`traffic_volume`): Average traffic volume per meter of major roadways in the county.
+  - Homeownership (`homeownership`): Percentage of occupied housing units that are owned.
+  - Severe housing cost burden (`severe_ownership_cost`): Percentage of households that spend 50% or more of their household income on housing.
