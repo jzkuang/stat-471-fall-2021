@@ -364,7 +364,7 @@ i. Using the training set `college_train`, run a linear regression of `Accept` o
 
 ```{r}
 lm_fit <- lm(Accept~., data = college_train)
-summary(lm_acceptance)
+summary(lm_fit)
 ```
 **The value for R^{2} is 0.123, so 12.3% of the variation is explained by the regression.**
 
