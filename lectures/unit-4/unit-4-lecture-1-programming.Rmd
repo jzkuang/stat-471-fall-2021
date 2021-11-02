@@ -1,0 +1,153 @@
+---
+title: 'Unit 4 Lecture 1: Decision Trees'
+date: "November 2, 2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+Today, we will be using the `rpart` package to fit regression and classification trees (and the `rpart.plot` package to plot them).
+
+First, let's load some libraries:
+```{r, message = FALSE}
+library(rpart)             # install.packages("rpart")
+library(rpart.plot)        # install.packages("rpart.plot")
+library(tidyverse)
+```
+
+# Regression trees
+
+We will be using the `Hitters` data from the `ISLR2` package. Let's take a look:
+```{r, message = FALSE}
+Hitters = ISLR2::Hitters %>% 
+  as_tibble() %>% 
+  filter(!is.na(Salary)) %>%   # remove NA values (in general not necessary)
+  mutate(Salary = log(Salary)) # log-transform the salary
+Hitters
+```
+
+Let's split into train/test as usual:
+```{r}
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Hitters), round(0.8*nrow(Hitters)))
+Hitters_train = Hitters %>% filter(row_number() %in% train_samples)
+Hitters_test = Hitters %>% filter(!(row_number() %in% train_samples))
+```
+
+Before actually building the tree, let's look at how `Salary` depends on a couple important predictors: `CAtBat` and `Hits`:
+```{r}
+Hitters_train %>% ggplot(aes(x = CAtBat, y = Hits, colour = Salary)) +
+  geom_point() + theme_bw()
+```
+
+By eye, what split point on what feature would make sense to separate players with high salaries from players with low salaries? 
+
+## Fitting and plotting a regression tree
+
+Next, let's actually run the regression tree. The syntax is essentially the same as `lm`, so we get to use the nice formula notation again:
+```{r}
+tree_fit = rpart(Salary ~ ., data = Hitters_train)
+```
+
+We can plot the resulting tree using `rpart.plot`:
+```{r}
+rpart.plot(tree_fit)
+```
+
+Does the first split point match what we predicted above? 
+
+We can get a text summary of the tree as follows:
+```{r}
+tree_fit
+```
+
+The tree fit object has several other useful fields, including `variable.importance`:
+```{r}
+tree_fit$variable.importance
+```
+
+## Controlling the complexity of the fit
+
+The `control` argument of `rpart` can be specified to control how far down the tree is fit. In particular, the default for `control` is
+```{r, eval = FALSE}
+# this code is not meant to be run
+control = rpart.control(minsplit = 20, minbucket = round(minsplit/3))
+```
+
+Here, `minsplit` is the minimum number of observations that must exist in a node in order for a split to be attempted, and `minbucket` is the minimum number of observations in any terminal (i.e. leaf) node. The larger these numbers, the fewer nodes there will be in the tree. 
+
+Let's see what happens when we crank `minsplit` up to 80:
+```{r}
+tree_fit_2 = rpart(Salary ~ ., 
+                   control = rpart.control(minsplit = 80),
+                   data = Hitters_train)
+rpart.plot(tree_fit_2)
+```
+
+## Making predictions and evaluating test error
+
+As usual, we evaluate the performance of decision trees based on their test error. We can use the `predict` function to make predictions on our held-out test set for the two trees fitted above:
+```{r}
+pred_1 = predict(tree_fit, newdata = Hitters_test)
+pred_2 = predict(tree_fit_2, newdata = Hitters_test)
+results = tibble(Y = Hitters_test$Salary, Y_hat_1 = pred_1, Y_hat_2 = pred_2)
+results
+```
+
+We can then extract the RMSE of the two methods using `summarise`, as usual:
+```{r}
+results %>% summarise(RMSE_1 = sqrt(mean((Y - Y_hat_1)^2)), 
+                      RMSE_2 = sqrt(mean((Y-Y_hat_2)^2)))
+```
+Which method performs better? Why might this be the case? 
+
+# Classification trees
+
+To illustrate classification trees, let's use the `Heart` data:
+```{r, message = FALSE, warning = FALSE}
+url = "https://raw.githubusercontent.com/JWarmenhoven/ISLR-python/master/Notebooks/Data/Heart.csv"
+Heart = read_csv(url) %>% select(-...1)
+
+Heart
+```
+Again, let's split into train and test:
+```{r}
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Heart), round(0.8*nrow(Heart)))
+Heart_train = Heart %>% filter(row_number() %in% train_samples)
+Heart_test = Heart %>% filter(!(row_number() %in% train_samples))
+```
+
+Now, we can fit a classification tree as follows:
+```{r}
+tree_fit = rpart(AHD ~ ., 
+                 method = "class",              # classification 
+                 parms = list(split = "gini"),  # Gini index for splitting
+                 data = Heart_train)
+
+rpart.plot(tree_fit)
+```
+
+To make predictions, we can use `predict` as before:
+```{r}
+pred = predict(tree_fit, newdata = Heart_test)
+pred %>% head()
+```
+Note that by default, `predict` gives fitted probabilities for each class. We can either manually threshold these at 0.5 (or another value), or we can specify `type = "class"` to get the class predictions directly:
+
+```{r}
+pred = predict(tree_fit, newdata = Heart_test, type = "class")
+pred
+```
+
+We can then get the test misclassification error or the confusion matrix as usual:
+```{r}
+# misclassification error
+mean(pred != Heart_test$AHD)
+```
+
+```{r}
+# confusion matrix
+table(pred, truth = Heart_test$AHD)
+```

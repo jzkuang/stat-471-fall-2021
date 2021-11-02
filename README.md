@@ -44,21 +44,21 @@ Tue 10/19 | 3. Regression-based methods | Lasso regression | ISLR Ch. 6.2.2 | [C
 Thu 10/21 | 3. Regression-based methods | Unit 3 Review | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=a64c5b04-c853-49bf-a5f1-adc0003815b4) | [Quiz 3](https://canvas.upenn.edu/courses/1597404/assignments/9195949) in class;<br />([Quiz 3 from last semester](https://canvas.upenn.edu/courses/1597404/quizzes/2651215))
 Fri 10/22 | -- | Midterm review session (5:15-6:45pm in JMHH F85) | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=f9ffd566-a20b-4ca8-9ffe-adc80102a7e1); [Review materials](https://github.com/Katsevich-Teaching/stat-471-fall-2021/tree/main/midterm/midterm-review) | --
 Mon 10/25 | -- | -- | -- | -- | [Midterm exam](https://github.com/Katsevich-Teaching/stat-471-fall-2021/tree/main/midterm/midterm-fall-2021) (7-9pm in SHDH 350);<br />([Last year's midterm and solutions](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/midterm/midterm-spring-2021))
-Tue 10/26 | -- | Midterm solutions and final project intro | -- | TBA | --
+Tue 10/26 | -- | Discussion of midterm solutions | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=5ad4b412-8804-42cc-95c5-adca0104f3db) | --
 Wed 10/27 | -- | -- | -- | -- | [Homework 3](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-3/homework-3.pdf) due at 11:59pm
-Thu 10/28 | -- | Buffer | TBA | TBA | --
+Thu 10/28 | -- | Discussion of Quiz 3 and final project | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=30251262-927c-4a6e-ae6c-adca014342c0) | --
 Tue 11/2 | 4. Tree-based methods | Growing decision trees | ISLRv1 pp. 303-307, 311-314 / ISLRv2 pp. 327-331, 335-338 | TBA | --
 Thu 11/4 | 4. Tree-based methods | Tree pruning and bagging | ISLRv1 pp. 307-310, 314-317 / ISLRv2 pp. 331-334, 338-341 | TBA | --
 Tue 11/9 | 4. Tree-based methods | Random forests | ISLRv1 pp. 317-321 / ISLRv2 pp. 342-345| TBA | --
 Thu 11/11 | 4. Tree-based methods | Boosting | ISLR Ch. 8.2.3 | TBA | --
-Tue 11/16 | 4. Tree-based methods | Unit 4 Review | -- | TBA | Quiz 4 in class
-Wed 11/17 | -- | -- | -- | -- | Homework 4 due at 11:59pm
+Tue 11/16 | 4. Tree-based methods | Unit 4 Review | -- | TBA | Quiz 4 in class;<br />([Quiz 4 from last semester](https://canvas.upenn.edu/courses/1597404/quizzes/2651237))
+Wed 11/17 | -- | -- | -- | -- | [Homework 4](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-4/homework-4.pdf) due at 11:59pm
 Thu 11/18 | 5. Deep learning | Intro to deep learning | ISLRv2 Ch. 10.1, 10.2, 10.6| TBA | --
 Tue 11/23 | 5. Deep learning | Optimization and computation | ISLRv2 Ch. 10.7 | TBA | --
 Thu 11/25 | -- | Thanksgiving break | -- | -- | --
 Tue 11/30 | 5. Deep learning | Deep learning for image processing | ISLRv2 Ch. 10.3 | TBA | --
 Thu 12/2 | 5. Deep learning | Deep learning for text processing | ISLRv2 Ch. 10.4-10.5 | TBA | --
-Tue 12/7 | 5. Deep learning | Unit 5 Review | -- | TBA | Quiz 5 in class
+Tue 12/7 | 5. Deep learning | Unit 5 Review | -- | TBA | Quiz 5 in class;<br />(There was no Quiz 5 last semester.)
 Wed 12/8 | -- | -- | -- | -- | Homework 5 due at 11:59pm
 Thu 12/9 | -- | Course wrap-up | -- | TBA | --
 Sun 12/19 | -- | -- | -- | -- | Final project due at 11:59pm
