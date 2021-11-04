@@ -47,7 +47,7 @@ Mon 10/25 | -- | -- | -- | -- | [Midterm exam](https://github.com/Katsevich-Teac
 Tue 10/26 | -- | Discussion of midterm solutions | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=5ad4b412-8804-42cc-95c5-adca0104f3db) | --
 Wed 10/27 | -- | -- | -- | -- | [Homework 3](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/homework/homework-3/homework-3.pdf) due at 11:59pm
 Thu 10/28 | -- | Discussion of Quiz 3 and final project | -- | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=30251262-927c-4a6e-ae6c-adca014342c0) | --
-Tue 11/2 | 4. Tree-based methods | Growing decision trees | ISLRv1 pp. 303-307, 311-314 / ISLRv2 pp. 327-331, 335-338 | TBA | --
+Tue 11/2 | 4. Tree-based methods | Growing decision trees | ISLRv1 pp. 303-307, 311-314 / ISLRv2 pp. 327-331, 335-338 | [Class session (video)](https://upenn.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=a4fe50e0-d2d5-4132-ae22-add300e0c6f0); [Slides (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-4/unit-4-lecture-1-slides.pdf); [Programming material (.rmd)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-4/unit-4-lecture-1-programming.Rmd); [Programming material (.pdf)](https://github.com/Katsevich-Teaching/stat-471-fall-2021/blob/main/lectures/unit-4/unit-4-lecture-1-programming.pdf) | --
 Thu 11/4 | 4. Tree-based methods | Tree pruning and bagging | ISLRv1 pp. 307-310, 314-317 / ISLRv2 pp. 331-334, 338-341 | TBA | --
 Tue 11/9 | 4. Tree-based methods | Random forests | ISLRv1 pp. 317-321 / ISLRv2 pp. 342-345| TBA | --
 Thu 11/11 | 4. Tree-based methods | Boosting | ISLR Ch. 8.2.3 | TBA | --

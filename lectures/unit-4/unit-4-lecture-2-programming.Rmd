@@ -1,0 +1,138 @@
+---
+title: 'Unit 4 Lecture 2: Pruning and cross-validating decision trees'
+date: "November 4, 2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+Today, we will learn how to select the complexity of decision trees based on cost complexity pruning and cross-validation, as implemented in the `rpart` package.
+
+First, let's load some libraries:
+```{r, message = FALSE}
+library(rpart)             # install.packages("rpart")
+library(rpart.plot)        # install.packages("rpart.plot")
+library(tidyverse)
+```
+
+# Regression trees
+
+Like last time, we will be using the `Hitters` data from the `ISLR` package, splitting into training and testing:
+```{r, message = FALSE}
+Hitters = ISLR2::Hitters %>% 
+  as_tibble() %>% 
+  filter(!is.na(Salary)) %>%   # remove NA values (in general not necessary)
+  mutate(Salary = log(Salary)) # log-transform the salary
+Hitters
+
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Hitters), round(0.8*nrow(Hitters)))
+Hitters_train = Hitters %>% filter(row_number() %in% train_samples)
+Hitters_test = Hitters %>% filter(!(row_number() %in% train_samples))
+```
+
+As before, we fit a regression tree by calling `rpart`:
+```{r}
+tree_fit = rpart(Salary ~ ., data = Hitters_train)
+rpart.plot(tree_fit)
+```
+
+## Tree pruning and cross validation
+
+It turns out that in addition to growing the tree, behind the scenes `rpart` has already:
+
+- used cost complexity pruning to get the nested sequence of trees
+- applied 10-fold cross-validation to compute the CV estimates and standard errors for each value of $\alpha$
+
+All we need to do is call the `printcp` function to get a summary of all this information:
+```{r}
+printcp(tree_fit)
+```
+Let's focus on the table at the bottom of this output. Each row corresponds to a tree in the sequence obtained by pruning. Let's discuss each column in turn:
+
+- `CP` is the "complexity parameter" $\alpha$. Be careful! This terminology is a bit misleading because higher complexity parameters correspond to less complex models (just like lambda in penalized regression). 
+- `nsplit` is the number of splits in the tree. Note that `1+nsplit` is the number of terminal nodes in the tree.
+- `rel error` is the RSS training error of the tree, normalized by the total variance of the response; equivalently, this is $1-R^2$. The training error decreases as the complexity increases.
+- `xerror` is the cross-validation error estimate.
+- `xstd` is the cross-validation standard error.
+
+The exact values of the complexity parameter are not so important; we might as well parameterize the trees based on the number of terminal nodes. Armed with all this information, we can produce a CV plot. The built-in function to produce the CV plot is not as nice as the one built into `cv.glmnet`, so we'll make our own using `ggplot`:
+```{r}
+cp_table = printcp(tree_fit) %>% as_tibble()
+cp_table
+cp_table %>% 
+  ggplot(aes(x = nsplit+1, y = xerror, 
+             ymin = xerror - xstd, ymax = xerror + xstd)) + 
+  geom_point() + geom_line() +
+  geom_errorbar(width = 0.2) +
+  xlab("Number of terminal nodes") + ylab("CV error") + 
+  geom_hline(aes(yintercept = min(xerror)), linetype = "dashed") + 
+  theme_bw()
+```
+
+Audience participation: How many terminal nodes would we choose based on the one-standard-error rule? 
+
+Unfortunately, we don't have a convenient lambda.1se field of the output to directly extract the optimal complexity parameter based on the one standard error rule. Nevertheless, we can find it pretty simply using `dplyr`:
+```{r}
+optimal_tree_info = cp_table %>% 
+  filter(xerror - xstd < min(xerror)) %>% 
+  arrange(nsplit) %>% 
+  head(1)
+optimal_tree_info
+```
+Audience participation: What is the above code is doing? Why is `nsplit` two rather than three as suggested by the plot above?
+
+## Extracting the pruned tree and making predictions
+
+To actually get the optimal pruned tree, we need to use the function `prune`, specifying the complexity parameter 
+
+```{r}
+optimal_tree = prune(tree = tree_fit, cp = optimal_tree_info$CP)
+```
+
+As before, we can plot this tree using `rpart.plot`:
+```{r}
+rpart.plot(optimal_tree)
+```
+
+That is a small tree! In the bias variance trade-off, sometimes less (complexity) is more (predictive performance). 
+
+Now we can make predictions on the test data and evaluate MSE using this tree:
+```{r}
+pred = predict(optimal_tree, newdata = Hitters_test)
+pred
+
+mean((pred-Hitters_test$Salary)^2)
+```
+
+# Exercise: Classification trees
+
+Let's continue with the heart disease data from last time: 
+```{r, message = FALSE, warning = FALSE}
+# download the data
+url = "https://raw.githubusercontent.com/JWarmenhoven/ISLR-python/master/Notebooks/Data/Heart.csv"
+Heart = read_csv(url, col_types = "-iffiiiiiddiiff")
+
+# split into train/test
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Heart), round(0.8*nrow(Heart)))
+Heart_train = Heart %>% filter(row_number() %in% train_samples)
+Heart_test = Heart %>% filter(!(row_number() %in% train_samples))
+
+# fit a classification tree
+tree_fit = rpart(AHD ~ ., 
+                 method = "class",              # classification 
+                 parms = list(split = "gini"),  # Gini index for splitting
+                 data = Heart_train)
+```
+
+## Tree pruning and cross-validation
+
+1. Produce the table of the trees in the sequence obtained from cost complexity pruning. What exactly is the interpretation of the `CP` column in this case? Do the values make sense? 
+
+2. Produce the CV plot. How many terminal nodes would we choose based on the one-standard-error rule? Do we notice anything strange about the CV plot?
+
+3. Extract and visualize the tree chosen by cross-validation. In words, how would you summarize the resulting decision rule? 
+
+4. What is the test misclassification error of this decision rule? 
