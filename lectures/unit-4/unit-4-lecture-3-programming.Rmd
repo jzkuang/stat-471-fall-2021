@@ -1,0 +1,211 @@
+---
+title: 'Unit 4 Lecture 3: Random forests'
+date: "November 9, 2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+Today, we will learn how to train and tune random forests using the `randomForest` package.
+
+First, let's load some libraries:
+```{r, message = FALSE}
+library(randomForest)       # install.packages("randomForest")
+library(tidyverse)
+```
+
+# Random forests for regression
+
+We will continue using the `Hitters` data from the `ISLR` package, splitting into training and testing:
+```{r, message = FALSE}
+Hitters = ISLR2::Hitters %>% 
+  as_tibble() %>% 
+  filter(!is.na(Salary)) %>%  
+  mutate(Salary = log(Salary)) # log-transform the salary
+Hitters
+
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Hitters), round(0.8*nrow(Hitters)))
+Hitters_train = Hitters %>% filter(row_number() %in% train_samples)
+Hitters_test = Hitters %>% filter(!(row_number() %in% train_samples))
+```
+
+## Training a random forest
+
+To train a random forest with default settings, we use the following syntax:
+```{r}
+rf_fit = randomForest(Salary ~ ., data = Hitters_train)
+?randomForest
+```
+
+We can get a quick visualization by using `plot`, which shows us the OOB error as a function of the number of trees. 
+```{r}
+plot(rf_fit)
+```
+
+We see that this error stays flat as soon as `B` is large enough (in this case stabilizing around 100).
+
+The key parameters controlling the random forest fit are the following:
+
+- `mtry`: number of variables to sample for each split (called m in lecture), default `floor(p/3)` for regression and `sqrt(p)` for classification
+- `nodesize`: minimum size of terminal nodes, default 1 for classification and 5 for regression
+- `maxnodes`: maximum number of terminal nodes trees in the forest can have, default no maximum
+- `ntree`: number of trees (called B in lecture), default 500
+
+We might want to specify the `mtry` parameter manually. For example, to get the bagging predictions we can set `mtry = 19`, since 19 is the total number of features:
+```{r}
+rf_fit = randomForest(Salary ~ ., mtry = 19, data = Hitters_train)
+plot(rf_fit)
+```
+
+## Tuning the random forest
+
+A quick-and-dirty way to tune a random forest is to try out a few different values of `mtry`:
+```{r}
+rf_3 = randomForest(Salary ~ ., mtry = 3, data = Hitters_train)
+rf_6 = randomForest(Salary ~ ., mtry = 6, data = Hitters_train)
+rf_19 = randomForest(Salary ~ ., mtry = 19, data = Hitters_train)
+```
+
+We can extract the OOB errors from each of these objects by using the `mse` field:
+```{r}
+oob_errors = bind_rows(
+  tibble(ntree = 1:500, oob_err = rf_3$mse, m = 3),
+  tibble(ntree = 1:500, oob_err = rf_6$mse, m = 6),
+  tibble(ntree = 1:500, oob_err = rf_19$mse, m = 19)
+)
+oob_errors  
+```
+We can then plot these as follows:
+```{r}
+oob_errors %>%
+  ggplot(aes(x = ntree, y = oob_err, colour = factor(m))) +
+  geom_line() + theme_bw()
+```
+
+Which value of `mtry` seems to work the best here?
+
+We can be a little more systematic in tuning the random forest by choosing a grid of values of `mtry` and plotting the OOB error for 500 trees versus `mtry`:
+
+```{r}
+# might want to cache this chunk!
+mvalues = seq(1,19, by = 2)
+oob_errors = numeric(length(mvalues))
+ntree = 500
+for(idx in 1:length(mvalues)){
+  m = mvalues[idx]
+  rf_fit = randomForest(Salary ~ ., mtry = m, data = Hitters_train)
+  oob_errors[idx] = rf_fit$mse[ntree]
+}
+tibble(m = mvalues, oob_err = oob_errors) %>%
+  ggplot(aes(x = m, y = oob_err)) + 
+  geom_line() + geom_point() + 
+  scale_x_continuous(breaks = mvalues) +
+  theme_bw()
+```
+
+## Variable importance
+
+Let's go back to the default random forest fit:
+```{r}
+rf_fit = randomForest(Salary ~ ., data = Hitters_train)
+```
+
+This object contains the purity-based feature importance in the `importance` field:
+```{r}
+rf_fit$importance
+```
+
+We can visualize these importances using the built-in function called `varImpPlot`:
+```{r}
+varImpPlot(rf_fit)
+```
+
+In lecture, we discussed that there were two variable importance measures. If we want to compute the second one (OOB-based importance), we need to explicitly specify this in the call to `randomForest`:
+```{r}
+rf_fit = randomForest(Salary ~ ., importance = TRUE, data = Hitters_train)
+```
+
+Now let's see what the `importance` field looks like:
+```{r}
+rf_fit$importance
+```
+We see there are now two columns instead of one! We can plot both of these feature importance measures using the same syntax as above:
+```{r}
+varImpPlot(rf_fit)
+```
+
+## Making predictions based on a random forest
+
+We can make predictions using `predict`, as usual:
+```{r}
+rf_predictions = predict(rf_fit, newdata = Hitters_test)
+rf_predictions
+```
+We can compute the mean-squared prediction error as usual too:
+```{r}
+mean((rf_predictions - Hitters_test$Salary)^2)
+```
+
+# Random forests for classification
+
+Random forests work very similarly for classification. Let's continue with the heart disease data from last time: 
+```{r, message = FALSE, warning = FALSE}
+# download the data
+url = "https://raw.githubusercontent.com/JWarmenhoven/ISLR-python/master/Notebooks/Data/Heart.csv"
+Heart = read_csv(url, col_types = "-iffiiiiiddiifc") %>% na.omit()
+
+# split into train/test
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Heart), round(0.8*nrow(Heart)))
+Heart_train = Heart %>% filter(row_number() %in% train_samples)
+Heart_test = Heart %>% filter(!(row_number() %in% train_samples))
+```
+
+Fitting a random forest uses the same basic syntax:
+```{r}
+# IMPORTANT: RESPONSE MUST BE CODED AS A FACTOR!
+rf_fit = randomForest(factor(AHD) ~ ., data = Heart_train)
+```
+
+Note that for random forests the default value of `mtry` is the square root of the number of features, in this case `floor(sqrt(13)) = 3`. 
+
+When we go to make the random forest plot it looks slightly different though:
+```{r}
+plot(rf_fit)
+```
+That is strange! Why does this happen? What's being plotted are three versions of the OOB error, which are stored in `rf_fit$err.rate`:
+```{r}
+rf_fit$err.rate %>% head()
+```
+We have the OOB error column as well as two other columns, which correspond to error rates specific to each value of the response. In this class we'll ignore the latter two and focus on the OOB error, which we can plot as follows:
+```{r}
+tibble(oob_error = rf_fit$err.rate[,"OOB"],
+       trees = 1:500) %>%
+  ggplot(aes(x = trees, y = oob_error)) + geom_line() + theme_bw()
+```
+
+We can use the same parameters `ntree`, `mtry`, `nodesize`, and `maxnodes` as for regression random forests. For example, let's take a look at what happens when we vary `mtry`:
+
+```{r}
+rf_3 = randomForest(factor(AHD) ~ ., mtry = 3, data = Heart_train)
+rf_7 = randomForest(factor(AHD) ~ ., mtry = 7, data = Heart_train)
+rf_13 = randomForest(factor(AHD) ~ ., mtry = 13, data = Heart_train)
+
+oob_errors = bind_rows(
+  tibble(ntree = 1:500, oob_err = rf_3$err.rate[,"OOB"], m = 3),
+  tibble(ntree = 1:500, oob_err = rf_7$err.rate[,"OOB"], m = 7),
+  tibble(ntree = 1:500, oob_err = rf_13$err.rate[,"OOB"], m = 13)
+)
+
+oob_errors %>%
+  ggplot(aes(x = ntree, y = oob_err, colour = factor(m))) +
+  geom_line() + theme_bw()
+```
+
+We can make variable importance plots in the same way too:
+```{r}
+rf_fit = randomForest(factor(AHD) ~ ., importance = TRUE, data = Heart_train)
+varImpPlot(rf_fit)
+```

@@ -1,0 +1,298 @@
+---
+title: 'Unit 4 Lecture 4: Boosting'
+date: "November 11, 2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+Today, we will learn how to train and tune boosting models using the `gbm` package.
+
+First, let's load some libraries:
+```{r, message = FALSE}
+library(gbm)       # install.packages("gbm")
+library(tidyverse)
+```
+
+# Boosting models for regression
+
+We will continue using the `Hitters` data from the `ISLR` package, splitting into training and testing:
+```{r, message = FALSE}
+Hitters = ISLR2::Hitters %>% 
+  as_tibble() %>% 
+  filter(!is.na(Salary)) %>%  
+  mutate(Salary = log(Salary)) # log-transform the salary
+Hitters
+
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Hitters), round(0.8*nrow(Hitters)))
+Hitters_train = Hitters %>% filter(row_number() %in% train_samples)
+Hitters_test = Hitters %>% filter(!(row_number() %in% train_samples))
+```
+
+## Training a gradient boosting model
+
+Arguments:
+
+- `distribution`: "gaussian" for continuous responses; "bernoulli" for binary responses
+- `n.trees`: maximum number of trees to try; defaults to 100 but this is normally not enough trees
+- `interaction.depth`: interaction depth; defaults to 1
+- `shrinkage`: shrinkage parameter lambda: defaults to 0.1
+- `bag.fraction`: subsampling fraction pi; defaults to 0.5
+- `cv.folds`: number of CV folds to use; defaults to 0 (i.e. no CV)
+- `train.fraction`: fraction of data to use as training; rest used as validation set
+
+```{r}
+# read more about the inputs and outputs, bells and whistles of gbm
+?gbm
+```
+
+Training the model:
+```{r}
+set.seed(1)
+gbm_fit = gbm(Salary ~ .,
+              distribution = "gaussian",
+              n.trees = 100,
+              interaction.depth = 1,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Hitters_train)
+```
+
+We can visualize the CV error using `gbm.perf`, which both makes a plot and outputs the optimal number of trees:
+```{r}
+opt_num_trees = gbm.perf(gbm_fit)
+opt_num_trees
+```
+
+The green curve is the CV error; the black curve is the training error. The dashed blue line indicates the minimum of the CV error. 
+
+Note that `gbm_fit$cv.error` also contains the CV errors, so these can be plotted manually as well:
+```{r}
+ntrees = 100
+tibble(Iteration = 1:ntrees, CV = gbm_fit$cv.error) %>%
+  ggplot(aes(x = Iteration, y = CV)) + geom_line() +
+  theme_bw()
+```
+
+We want to make sure there are enough trees that the CV curve has reached its minimum. For example, suppose we had chosen a smaller shrinkage parameter, e.g. 0.01:
+
+```{r}
+set.seed(1)
+gbm_fit_slow = gbm(Salary ~ .,
+                   distribution = "gaussian",
+                   n.trees = 100,
+                   interaction.depth = 1,
+                   shrinkage = 0.01,
+                   cv.folds = 5,
+                   data = Hitters_train)
+gbm.perf(gbm_fit_slow)
+```
+We see that 100 is not enough trees for lambda = 0.01. In this case, we would need to increase the number of trees:
+
+```{r}
+set.seed(1)
+gbm_fit_slow = gbm(Salary ~ .,
+                   distribution = "gaussian",
+                   n.trees = 1000,
+                   interaction.depth = 1,
+                   shrinkage = 0.01,
+                   cv.folds = 5,
+                   data = Hitters_train)
+gbm.perf(gbm_fit_slow)
+```
+
+## Tuning the interaction depth
+
+The quick way to tune the interaction depth is to try out a few different values:
+```{r}
+set.seed(1)
+gbm_fit_1 = gbm(Salary ~ .,
+              distribution = "gaussian",
+              n.trees = 100,
+              interaction.depth = 1,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Hitters_train)
+gbm_fit_2 = gbm(Salary ~ .,
+              distribution = "gaussian",
+              n.trees = 100,
+              interaction.depth = 2,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Hitters_train)
+gbm_fit_3 = gbm(Salary ~ .,
+              distribution = "gaussian",
+              n.trees = 100,
+              interaction.depth = 3,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Hitters_train)
+```
+
+We can extract the CV errors from each of these objects by using the `cv.error` field:
+```{r}
+ntrees = 100
+cv_errors = bind_rows(
+  tibble(ntree = 1:ntrees, cv_err = gbm_fit_1$cv.error, depth = 1),
+  tibble(ntree = 1:ntrees, cv_err = gbm_fit_2$cv.error, depth = 2),
+  tibble(ntree = 1:ntrees, cv_err = gbm_fit_3$cv.error, depth = 3)
+)
+cv_errors
+```
+
+We can then plot these as follows:
+```{r}
+cv_errors %>%
+  ggplot(aes(x = ntree, y = cv_err, colour = factor(depth))) +
+  geom_line() + theme_bw()
+```
+
+Which value of `interaction.depth` seems to work the best here?
+
+Let's save the optimal model and optimal number of trees (note `plot.it = FALSE` in `gbm.perf` to extract the optimal number of trees without making the CV plot again):
+```{r}
+gbm_fit_optimal = gbm_fit_3
+optimal_num_trees = gbm.perf(gbm_fit_3, plot.it = FALSE) 
+optimal_num_trees
+```
+
+## Model interpretation
+
+Let's now interpret our tuned model. To get the variable importance measures, we use `summary`, specifying the number of trees via the `n.trees` argument:
+```{r}
+summary(gbm_fit_optimal, n.trees = optimal_num_trees, plotit = FALSE)
+```
+
+We can also make the partial dependence plots for the different features using `plot`:
+```{r}
+plot(gbm_fit_optimal, i.var = "CAtBat", n.trees = optimal_num_trees)
+plot(gbm_fit_optimal, i.var = "CRuns", n.trees = optimal_num_trees)
+```
+
+## Making predictions based on a boosting model:
+
+We can make predictions using `predict`, as usual, but we need to specify the number of trees to use:
+```{r}
+gbm_predictions = predict(gbm_fit_optimal, n.trees = optimal_num_trees,
+                          newdata = Hitters_test)
+gbm_predictions
+```
+We can compute the mean-squared prediction error as usual too:
+```{r}
+mean((gbm_predictions - Hitters_test$Salary)^2)
+```
+
+# Boosting for classification
+
+Boosting models work very similarly for classification. Let's continue with the heart disease data from last time: 
+```{r, message = FALSE, warning = FALSE}
+url = "https://raw.githubusercontent.com/JWarmenhoven/ISLR-python/master/Notebooks/Data/Heart.csv"
+Heart = read_csv(url, col_types = "-iffiiiiiddiifc") %>% 
+  na.omit() %>% 
+  mutate(AHD = ifelse(AHD == "Yes", 1, 0))  # gbm expects response to be 0-1,
+                                            #  NOT factor (unlike RF)
+
+# split into train/test
+set.seed(1) # set seed for reproducibility
+train_samples = sample(1:nrow(Heart), round(0.8*nrow(Heart)))
+Heart_train = Heart %>% filter(row_number() %in% train_samples)
+Heart_test = Heart %>% filter(!(row_number() %in% train_samples))
+```
+
+Fitting a boosting model uses the same basic syntax, but with `distribution = "bernoulli"`:
+```{r}
+set.seed(1)
+gbm_fit = gbm(AHD ~ .,
+              distribution = "bernoulli",
+              n.trees = 100,
+              interaction.depth = 1,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Heart_train)
+```
+
+Common pitfalls when fitting a `gbm`:
+
+- The binary response is coded as a `character`, e.g. "Yes"/"No".
+- The binary response is coded as a `factor`. 
+- Any of the features are coded as strings, rather than factors.
+
+```{r}
+gbm.perf(gbm_fit)
+```
+
+We can tune the interaction depth in the same way as before:
+
+```{r}
+# try a few values
+set.seed(1)
+gbm_fit_1 = gbm(AHD ~ .,
+              distribution = "bernoulli",
+              n.trees = 100,
+              interaction.depth = 1,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Heart_train)
+set.seed(1)
+gbm_fit_2 = gbm(AHD ~ .,
+              distribution = "bernoulli",
+              n.trees = 100,
+              interaction.depth = 2,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Heart_train)
+set.seed(1)
+gbm_fit_3 = gbm(AHD ~ .,
+              distribution = "bernoulli",
+              n.trees = 100,
+              interaction.depth = 3,
+              shrinkage = 0.1,
+              cv.folds = 5,
+              data = Heart_train)
+
+# extract CV errors
+ntrees = 100
+cv_errors = bind_rows(
+  tibble(ntree = 1:ntrees, cv_err = gbm_fit_1$cv.error, depth = 1),
+  tibble(ntree = 1:ntrees, cv_err = gbm_fit_2$cv.error, depth = 2),
+  tibble(ntree = 1:ntrees, cv_err = gbm_fit_3$cv.error, depth = 3)
+)
+
+# plot CV errors
+cv_errors %>%
+  ggplot(aes(x = ntree, y = cv_err, colour = factor(depth))) +
+  geom_line() + theme_bw()
+```
+
+Aha! We see some overfitting! For which values of interaction depth do we see more overfitting, and why? What is the optimal interaction depth?
+
+```{r}
+gbm_fit_optimal = gbm_fit_1
+optimal_num_trees = gbm.perf(gbm_fit_1, plot.it = FALSE) 
+```
+
+We can calculate variable importance scores as before:
+```{r}
+summary(gbm_fit_optimal, n.trees = optimal_num_trees, plotit = FALSE)
+```
+
+For the partial dependence plots, it's useful to specify `type = "response"` so we can interpret the y axis on the probability scale:
+```{r}
+plot(gbm_fit_optimal, i.var = "ChestPain", n.trees = optimal_num_trees, type = "response")
+plot(gbm_fit_optimal, i.var = "Age", n.trees = optimal_num_trees, type = "response")
+```
+
+To make predictions, use the same syntax as before but with `type = "response"` to get predictions on the probability scale:
+```{r}
+gbm_probabilities = predict(gbm_fit_optimal, n.trees = optimal_num_trees,
+                          type = "response", newdata = Heart_test)
+gbm_probabilities
+```
+
+We can then threshold the probabilities at 0.5 as usual and calculate the misclassification error:
+```{r}
+gbm_predictions = as.numeric(gbm_probabilities > 0.5)
+mean(gbm_predictions != Heart_test$AHD)
+```
