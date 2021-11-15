@@ -1,10 +1,6 @@
 ---
 title: 'STAT 471: Midterm Exam'
-<<<<<<< HEAD
-author: 'James Kuang'
-=======
 author: 'Name'
->>>>>>> 3508cc1399aae09139ac1a562cdc0e294a42a23b
 date: 'October 25, 2021, 7:00-9:00pm'
 output:
   bookdown::pdf_document2:

@@ -39,7 +39,11 @@ In accordance with this policy,
 
 *Please list anyone you discussed this homework with:* 
 
+Alex Chen
+
 *Please list what external references you consulted (e.g. articles, books, or websites):*
+
+StackOverflow
 
 ## Writeup {-}
 
@@ -119,8 +123,11 @@ First, let's explore the training data.
 A good first step when tackling a classification problem is to look at the class proportions.
 
 i. (1 points) What fraction of the training observations are spam? 
+**About `r mean(spam_train$spam)` are spam.**
+
 
 ii. (2 points) Assuming the test data contain the same class proportions, what would be the misclassification error of a naive classifier that always predicts the majority class?
+**That means a naive classifer would have a misclassification error rate of around 40%.**
 
 ## Exploring word frequencies (15 points)
 
@@ -132,11 +139,31 @@ Let's first take a look at the average word frequencies across all emails. This 
 
 i. (3 points) Produce a tibble called `avg_word_freq` containing the average frequencies of each word by calling `summarise_at` on `spam_train`. Print this tibble (no need to use kable). (Hint: Check out the documentation for `summarise_at` by typing `?summarise_at`. Specify all columns starting with "word_freq_" via `vars(starts_with("word_freq"))`).
 
+```{r freq}
+#Mean for Each Column
+avg_word_freq <- spam_train %>% 
+  summarise_at(vars(starts_with("word_freq")), mean)
+```
+
+
 ii. (3 points) Create a tibble called `avg_word_freq_long` by calling `pivot_longer` on `avg_word_freq`. The result should have 48 rows and two columns called `word` and `avg_freq`, the former containing each word and the latter containing its average frequency. Print this tibble (no need to use kable). [Hint: Use `cols = everything()` to pivot on all columns and `names_prefix = "word_freq_"` to remove this prefix.]
+
+```{r}
+#Pivot the talbe longer
+avg_word_freq_long <- avg_word_freq %>% 
+  pivot_longer(cols = everything(), names_to = "word", names_prefix = "word_freq_", values_to = "avg_freq")
+```
 
 iii. (2 points) Produce a histogram of the word frequencies. What are the top three most frequent words? How can it be that a word has a frequency of more than 1? 
 
-**The top three most frequent words are "you", "your", and "george". The frequencies are percentages, so their maximum value is 100 rather than 1.** 
+```{r word_hist, fig.width = 4.5, fig.height= 4.5, out.width= "60%", fig.align= 'center', fig.cap="Histogram of Average Word Frequencies", fig.pos="H"}
+#Plot a histogram
+ggplot(avg_word_freq_long, aes(x= avg_freq)) +
+  geom_histogram(bins = 15) +
+  theme_bw() +
+  labs(x = "Average Frequency", y = "Number of Words")
+```
+**The top three most frequent words are "you", "your", and "george" with frequencies of 1.66, 0.820, and 0.772 respectively. These frequencies are percentages and are multiplied by 100, so their maximum value is 100 rather than 1.** 
 
 ### Differencies in word frequencies between spam and non-spam (7 points)  
 
@@ -144,10 +171,33 @@ Perhaps even more important than overall average word frequencies are the *diffe
 
 iv. (4 points) For each word, compute the difference between its average frequency among spam and non-spam emails (i.e. average frequency in spam emails minus average frequency in non-spam emails). Store these differences in a tibble called `diff_avg_word_freq`, with columns `word` and `diff_avg_freq`. Print this tibble (no need to use kable). 
 
+```{r}
+# Using one long pipe
+diff_avg_word_freq <- spam_train %>% 
+  group_by(spam) %>% 
+  summarise_at(vars(starts_with("word_freq")), mean) %>% # Summarizing
+  ungroup() %>% 
+  pivot_longer(!spam, names_to = "word", # Pivoting longer 
+               names_prefix = "word_freq_", values_to = "word_freq") %>% 
+  pivot_wider(names_from = spam, # Pivoting wider
+              values_from = word_freq) %>% 
+  mutate(diff_avg_freq = `1` - `0`) %>% 
+  select(c("word", "diff_avg_freq"))
+diff_avg_word_freq
+```
+
+
 [Full credit will be given for any logically correct method of doing this. Three extra credit points will be given for a correct solution that employs one continuous sequence of pipes.] 
 
 v. (3 points) Plot a histogram of these word frequency differences. Which three words are most overrepresented in spam emails? Which three are most underrepresented in spam emails? Do these make sense? 
-
+```{r word_hist, fig.width = 4.5, fig.height= 4.5, out.width= "60%", fig.align= 'center', fig.cap="Histogram of Difference in Average Word Frequencies", fig.pos="H"}
+# Plotting a histogram of difference in average word frequencies
+ggplot(diff_avg_word_freq, aes(x= diff_avg_freq)) +
+  geom_histogram(bins = 15) +
+  theme_bw() +
+  labs(x = "Difference in Average Frequency", y = "Number of Words")
+```
+**The most represented words are "you", "your", and "free" while the most underrepresented are "george", "hp", and "hpl." This makes a certain amount of sense as you and your are probably represented a lot in spam emails as they want you to do something. Free also makes sense as spam emails are often offering free stuff. The underrepresented words also make sense given where the data came from. George is the name of the donor, so any email mentioning him would have likely been personal. He worked for Hewlett-Packard Labs, so HP and HPL would be signals of something being a work email.**
 
 # Classification trees (20 points for correctness; 5 points presentation)
 
@@ -157,9 +207,22 @@ In this problem, we will train classification trees to get some more insight int
 
 i. (1 point) Fit a classification tree with splits based on the Gini index, with default `control` parameters. Plot this tree.
 
+```{r plot, fig.width = 6.5, fig.height= 6.5, out.width= "60%", fig.align= 'center', fig.cap="Classification Tree for Spam", fig.pos="H"}
+# Plotting a default classificaiton tree
+tree_fit = rpart(spam ~ .,
+  method = "class", # classification
+  parms = list(split = "gini"), # Gini index for splitting
+  data = spam_train)
+rpart.plot(tree_fit)
+```
+
+
 ii. (2 points) How many splits are there in this tree? How many terminal nodes does the tree have? 
+**There are 7 splits and 8 terminal nodes.**
 
 iii. (5 points) What sequence of splits (specify the feature, the split point, and the direction) leads to the terminal node that has the largest fraction of spam observations? Does this sequence of splits make sense as flagging likely spam emails? What fraction of spam observations does this node have? What fraction of the training observations are in this node? 
+
+**The does not have a dollar sign character frequency less than 0.056 and then does not have a "hp" word frequency above 0.41 leads to the terminal node with the largest fraction of spam observations. This makes sense as having a lot of $ means that the email is likely spam. Further, not having the "hp" word means that those dollar signs aren't work related. This node has around 63% of all spam observations and 24% of all training observations.**
 
 ## Finding a tree of optimal size via pruning and cross-validation (12 points)
 
@@ -169,24 +232,66 @@ Now let's find the optimal tree size.
 
 i. (2 points) While we could simply prune back the default tree, there is a possibility the default tree is not large enough. In terms of the bias-variance tradeoff, why would it be a problem if the default tree were not large enough? 
 
+**If the tree wasn't large enough, then it wouldn't have the flexibility necessary to capture this problem so it would be too biased without enough variance.**
+
 ii. (2 points) First let us fit the deepest possible tree. In class we talked about the arguments `minsplit` and `minbucket` to `rpart.control`. What values of these parameters will lead to the deepest possible tree? There is also a third parameter `cp`. Read about this parameter by typing `?rpart.control`. What value of this parameter will lead to the deepest possible tree?
+
+**For minsplit and minbucket, the value that leads to the deepest possible tree is 1. 1 means that every single observation will have a terminal node, and thus it's not possible to split the tree any further. For cp, a value of 0 would lead to the deepest possible tree as cp is a hurdle overwhich every split needs to cross. Setting that hurdle to 0 means that no split isn't worth considering.**
 
 iii. (1 point) Fit the deepest possible tree $T_0$ based on the `minsplit`, `minbucket`, and `cp` parameters from the previous sub-part. Print the CP table for this tree (using kable).
 
 ```{r}
 set.seed(1) # for reproducibility (DO NOT CHANGE)
+#Fitting on the deepest tree
+tree_fit_deepest = rpart(spam ~ .,
+  method = "class", # classification
+  parms = list(split = "gini"), # Gini index for splitting
+  data = spam_train, 
+  control = rpart.control(minsplit = 1, minbucket = 1, cp = 0))
+
+cp_table = printcp(tree_fit_deepest) %>% as_tibble()
+cp_table
+#rpart.plot(tree_fit_deepest)
 ```
 
 iv. (4 points) How many distinct trees are there in the sequence of trees produced in part iii? How many splits does the biggest tree have? How many average observations per terminal node does it have, and why is it not 1?
+**There are 23 trees. The biggest tree has 205 splits, so the average observation per terminal node is 14.95. This is not one because, once terminal nodes contain observations that are all the same type, there is nothing to gain by splitting more as the model is already fitted perfectly to the training data.**
 
 ### Tree-pruning and cross-validation (3 points)
 
 i. (1 points) Produce the CV plot based on the information in the CP table printed above. For cleaner visualization, plot only trees with `nsplit` at least 2, and put the x-axis on a log scale using `scale_x_log10()`.
+```{r fig.width = 5.5, fig.height= 5.5, out.width= "60%", fig.align= 'center', fig.cap="CV Plot For Nodes", fig.pos="H"}
+# Plotting the CV error based on # of terminal nodes
+cp_table %>% 
+  filter(nsplit>=2) %>% 
+  ggplot(aes(x = nsplit+1, y = xerror, 
+             ymin = xerror - xstd, ymax = xerror + xstd)) + 
+  geom_point() + geom_line() +
+  geom_errorbar(width = 0.05) +
+  scale_x_log10() +
+  xlab("Number of terminal nodes") + ylab("CV error") + 
+  geom_hline(aes(yintercept = min(xerror)), linetype = "dashed") + 
+  theme_bw()
+```
 
 ii. (1 point) Using the one-standard-error rule, how many terminal nodes does the optimal tree have? Is this smaller or larger than the number of terminal nodes in the default tree above?
 
+```{r}
+# Extract the best by 1-se rule
+optimal_tree_info = cp_table %>% 
+  filter(xerror - xstd < min(xerror)) %>% 
+  arrange(nsplit) %>% 
+  head(1)
+optimal_tree_info
+```
+**There are 18 nodes which is larger than the default tree.**
+
 iii. (1 point) Extract this optimal tree into an object called `optimal_tree` which we can use for prediction on the test set (see the last problem in this homework). 
 
+```{r}
+# Save the optimal tree
+optimal_tree = prune(tree = tree_fit, cp = optimal_tree_info$CP)
+```
 # Random forests (25 points for correctness; 5 points for presentation)
 
 Note: from this point onward, your code will be somewhat time-consuming. It is recommended that you cache your code chunks using the option `cache = TRUE` in the chunk header. This way, the results of these code chunks will be saved the first time you compile them (or after you change them), making subsequent compilations much faster.
@@ -194,11 +299,22 @@ Note: from this point onward, your code will be somewhat time-consuming. It is r
 ## Running a random forest with default parameters (4 points)
 
 i. (2 points) Train a random forest with default settings on `spam_train`. What value of `mtry` was used?
-```{r}
+```{r train, cache = TRUE}
 set.seed(1) # for reproducibility (DO NOT CHANGE)
+rf_fit = randomForest(factor(spam) ~ ., data = spam_train) # Train
 ```
+**For the default setting, mtry is the square root of the number of features or (assuming it rounds up) 8.**
 
 ii. (2 points) Plot the OOB error as a function of the number of trees. Roughly for what number of trees does the OOB error stabilize?
+
+```{r oob-tree, fig.width = 5.5, fig.height= 5.5, out.width= "60%", fig.align= 'center', fig.cap="OOB Error By Number of Trees", fig.pos="H"}
+# Plotting the OOB error by trees
+tibble(oob_error = rf_fit$err.rate[,"OOB"],
+  trees = 1:500) %>%
+  ggplot(aes(x = trees, y = oob_error)) + geom_line() + theme_bw() +
+  labs(y = "OOB Error")
+```
+
 
 ## Computational cost of random forests (7 points)
 
@@ -210,22 +326,54 @@ Recall that the purity-based variable importance is calculated automatically but
 
 i. (1 point) How long does it take to train the random forest with default parameter settings, with `importance = FALSE`? You can use the command `system.time(randomForest(...))`; see `?system.time` for more details.
 
+```{r cache = TRUE}
+time_import_false <- system.time(randomForest(factor(spam) ~ ., 
+                         data = spam_train, importance = FALSE))
+```
+**It took 4.73 seconds to train a random forest with `importance = False`.** 
+
 ii. (1 point) How long does it take to train the random forest with default parameter settings except `importance = TRUE`? How many times faster is the computation when `importance = FALSE`? 
+
+```{r cache = TRUE}
+time_import_true <- system.time(randomForest(factor(spam) ~ ., 
+                         data = spam_train, importance = TRUE))
+```
+**It took 9.56 seconds to train a random forest with `importance = TRUE`. The computation when `importance = FALSE` is two times faster.**
 
 ### Dependence on the number of trees
 
 Another setting influencing the computational cost of running `randomForest` is the number of trees; the default is `ntree = 500`.
 
 i. (3 points) Train five random forests, with `ntree = 100,200,300,400,500` (and `importance = FALSE`). Record the time it takes to train each one, and plot the time against `ntree`. You can programmatically extract the elapsed time by running `system.time(...)["elapsed"]`
+```{r cache=TRUE}
+time_tree <- tibble(ntree = numeric(), time = numeric())
+
+for (n in c(100, 200, 300, 400, 500)){
+  time_ntree <- system.time(randomForest(factor(spam) ~ ., ntree = n,
+                         data = spam_train, importance = FALSE))
+  time_tree <- time_tree %>% 
+    add_row(ntree = n, time = time_ntree["elapsed"])
+}
+```
+
+```{r time-tree-plot, fig.width = 5.5, fig.height= 5.5, out.width= "60%", fig.align= 'center', fig.cap="Runtime By Number of Trees", fig.pos="H"}
+ggplot(time_tree, aes(x = ntree, y = time)) + 
+  geom_line() + theme_bw() +
+  labs(x = "Number of Trees",
+       y = "Runtime (Seconds)")
+```
 
 
 ii. (2 points) What relationship between runtime and number of trees do you observe? Does it make sense in the context of the training algorithm for random forests? 
+**In Fig \@ref(fig:time-tree-plot), there is a linear relationship between runtime and number of trees. This makes sense as the Random Forest algorithm doesn't really have any elements of interaction between two different trees and so the runtime add of each additional tree is roughly the same.**
 
 ## Tuning the random forest (8 points)
 
 i. (2 points) Since tuning the random forest is somewhat time consuming, we want to be careful about tuning it smartly. To this end, does it make sense to tune the random forest with `importance = FALSE` or `importance = TRUE`? Based on OOB error plot from above, what would be a reasonable number of trees to grow without significantly compromising prediction accuracy? 
+**It makes more sense to use `importance = FALSE` as switching that numer to two increases the training time by a factor of two and using two variable importance measures doesn't really add much value. In Fig \@ref(fig:oob-tree), error roughly flattens by ntree = 200, so that should be a reasonable choice.**
 
 ii. (2 points) About how many minutes would it take to train a random forest with 500 trees for every possible value of m? (For the purposes of this question, you may assume for the sake of simplicity that the choice of m does not impact the training time too much.) Suppose you only have enough patience to wait about 15 seconds to tune your random forest, and you use the reduced number of trees from part i. How many values of m can you afford to try? (The answer will vary based on your computer. Some students will find that there is time for only one or a few values; this is ok.)
+**Using ntree=500, it would take roughly five minutes to train every possible value of m. If we only use 200 trees, we can afford to try around 8 values.**
 
 iii. (2 points) Tune the random forest based on the choices in parts i and ii (if on your computer you cannot calculate at least five values of m in 15 seconds, please calculate five values of m, even though it will take longer than 15 seconds). Make a plot of OOB error versus m, and identify the best value of m. How does it compare to the default value of m? 
 
